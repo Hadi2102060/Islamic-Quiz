@@ -1,0 +1,13 @@
+{
+    "@@locale": "en",
+    "appTitle": "Islamic Quiz",
+    "home": "Home",
+    "leaderboard": "Leaderboard",
+    "profile": "Profile",
+    "soundOn": "Sound On",
+    "soundOff": "Sound Off",
+    "languages": "Languages",
+    "@languages": {
+        "description": "Menu item for language selection"
+    }
+}

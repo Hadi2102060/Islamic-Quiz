@@ -1,0 +1,13 @@
+{
+    "@@locale": "bn",
+    "appTitle": "ইসলামিক কুইজ",
+    "home": "হোম",
+    "leaderboard": "লিডারবোর্ড",
+    "profile": "প্রোফাইল",
+    "soundOn": "সাউন্ড চালু",
+    "soundOff": "সাউন্ড বন্ধ",
+    "languages": "ভাষা",
+    "@languages": {
+        "description": "ভাষা নির্বাচন মেনু"
+    }
+}

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "477459495948",
+    "project_id": "islamicquiz-83516",
+    "storage_bucket": "islamicquiz-83516.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477459495948:android:ed62bd44baf1938dd20229",
+        "android_client_info": {
+          "package_name": "com.example.quiz_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "477459495948-4j85fcdkntafmbjurcgkr6spg3pen049.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG4UtLTW01HgQPZ_ap47ypodlZzJ-ISD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "477459495948-4j85fcdkntafmbjurcgkr6spg3pen049.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
