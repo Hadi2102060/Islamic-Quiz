@@ -1,13 +1,18 @@
-# Flutter
+# Flutter / Dart
 build/
 android/app/build/
-ios/Flutter/App.framework/
-ios/Flutter/Flutter.framework/
+ios/Flutter/
+.dart_tool/
+.packages
+pubspec.lock
 
-# Generated files
+# Large native libraries (very important)
+*.so
+
+# Generated APK/AAB
 *.apk
 *.aab
 *.ipa
 
-# Large files
-*.so
+# Gradle
+android/.gradle/
