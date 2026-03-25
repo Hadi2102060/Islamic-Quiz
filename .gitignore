@@ -1,0 +1,13 @@
+# Flutter
+build/
+android/app/build/
+ios/Flutter/App.framework/
+ios/Flutter/Flutter.framework/
+
+# Generated files
+*.apk
+*.aab
+*.ipa
+
+# Large files
+*.so
