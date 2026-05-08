@@ -39,60 +39,60 @@ The Islamic Quiz App is a mobile application that helps users test and improve t
 ## ✨ Features
 
 ### 1. **Quiz Categories**
-- 📚 Islamic Knowledge
-- 📖 কুরআন ও হাদিস (Quran & Hadith)
-- 🌍 General Quiz
-- 🕌 Surahs Quiz
-- 📝 Verses Quiz
-- 👤 Prophets Quiz
-- 📜 Seerah Quiz (Islamic History)
-- ✨ All Quiz (Combined)
+- Islamic Knowledge
+- কুরআন ও হাদিস (Quran & Hadith)
+- General Quiz
+- Surahs Quiz
+- Verses Quiz
+- Prophets Quiz
+- Seerah Quiz (Islamic History)
+-  All Quiz (Combined)
 
 ### 2. **Authentication**
-- 🔐 Phone Number-based OTP login
-- 📧 Email registration support
-- 🔑 Anonymous Firebase authentication
-- 🛡️ Secure session management with SharedPreferences
+-  Phone Number-based OTP login
+-  Email registration support
+-  Anonymous Firebase authentication
+-  Secure session management with SharedPreferences
 
 ### 3. **Quiz Features**
-- ⏱️ Timed quizzes with countdown timer
-- ✅ Multiple choice questions
-- 📊 Real-time score tracking
-- 🎯 Category-based filtering
-- 💾 Auto-save quiz progress
+-  Timed quizzes with countdown timer
+-  Multiple choice questions
+-  Real-time score tracking
+-  Category-based filtering
+-  Auto-save quiz progress
 
 ### 4. **Leaderboard System**
-- 🏆 Global rankings by category
-- 👥 Real-time leaderboard updates
-- 🥇 Top 3 champions display (Gold, Silver, Bronze)
-- 📸 User photos with avatars
-- ⚡ Dynamic scoring updates
+-  Global rankings by category
+-  Real-time leaderboard updates
+-  Top 3 champions display (Gold, Silver, Bronze)
+-  User photos with avatars
+-  Dynamic scoring updates
 
 ### 5. **User Profiles**
-- 👤 Complete profile setup (Name, Email, Phone)
-- 📸 Profile photo upload (base64 encoded)
-- 📊 Quiz statistics and history
-- 🎖️ Achievement badges
-- 📈 Personal best scores per category
+-  Complete profile setup (Name, Email, Phone)
+-  Profile photo upload (base64 encoded)
+-  Quiz statistics and history
+-  Achievement badges
+-  Personal best scores per category
 
 ### 6. **Achievements System**
-- 🎖️ Perfect Score badge (100% on quiz)
-- ⭐ Top 80% badge (80%+ score)
-- 🔥 Cumulative streak tracking
-- 📧 Achievement notifications
+-  Perfect Score badge (100% on quiz)
+-  Top 80% badge (80%+ score)
+-  Cumulative streak tracking
+-  Achievement notifications
 
 ### 7. **Social Integration**
-- 📱 Telegram channel connection
-- 💬 WhatsApp messaging
-- 📘 Facebook sharing
-- 🎥 YouTube channel subscription
-- 🔗 Deep linking to native apps
+-  Telegram channel connection
+-  WhatsApp messaging
+-  Facebook sharing
+-  YouTube channel subscription
+-  Deep linking to native apps
 
 ### 8. **Data Persistence**
-- 💾 Local caching (SharedPreferences)
-- 🔄 Real-time Firestore sync
-- 📱 Offline support (partial)
-- ♻️ Cache invalidation on updates
+-  Local caching (SharedPreferences)
+-  Real-time Firestore sync
+-  Offline support (partial)
+-  Cache invalidation on updates
 
 ---
 
@@ -119,10 +119,10 @@ The Islamic Quiz App is a mobile application that helps users test and improve t
 - **Build System**: Gradle (Android), Xcode (iOS)
 
 ### Platforms
-- ✅ Android (API 21+)
-- ✅ iOS (11+)
-- ✅ Web (experimental)
-- ✅ Linux, macOS, Windows (supported)
+-  Android (API 21+)
+-  iOS (11+)
+-  Web (experimental)
+-  Linux, macOS, Windows (supported)
 
 ---
 
@@ -357,9 +357,9 @@ The leaderboard has two views:
 
 #### 1. **Top 3 Champions Cards**
 ```
-🥇 1st Place (Largest)    Gold   Colors
-🥈 2nd Place (Medium)     Silver Colors
-🥉 3rd Place (Smallest)   Bronze Colors
+ 1st Place (Largest)    Gold   Colors
+ 2nd Place (Medium)     Silver Colors
+ 3rd Place (Smallest)   Bronze Colors
 
 Shows:
 - User avatar (photo or initials)
@@ -372,8 +372,8 @@ Shows:
 ```
 Rank | Avatar | Name  | Score | Badges | Stats
 -----|--------|-------|-------|--------|-------
-#1   | Photo  | Name1 | 35    | 🔥     | 18pts
-#2   | Photo  | Name2 | 28    | 🔥     | 14pts
+#1   | Photo  | Name1 | 35    |     | 18pts
+#2   | Photo  | Name2 | 28    |      | 14pts
 #3   | Avatar | Name3 | 25    | --     | 12pts
 ...
 ```
@@ -772,7 +772,7 @@ firebase deploy --only firestore:rules --project islamicquiz-83516
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Permission Denied on Leaderboard
 
@@ -805,7 +805,7 @@ firebase deploy --only firestore:rules --project islamicquiz-83516
 
 ---
 
-## 📝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
@@ -833,8 +833,8 @@ For issues, questions, or feedback:
 
 ## 👨‍💻 Authors
 
-Built with ❤️ for the Islamic community
+Built with  for the Islamic community
 
 **Last Updated**: May 8, 2026
 **Current Version**: 1.0.0
-**Status**: Production Ready ✅
+**Status**: Production Ready 
