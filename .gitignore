@@ -1,11 +1,12 @@
 # Flutter / Dart
 build/
+bdApps/
 android/app/build/
 ios/Flutter/
 .dart_tool/
 .packages
 pubspec.lock
-bdApps/
+
 
 # Large native libraries (very important)
 *.so
