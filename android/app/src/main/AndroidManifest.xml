@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="quiz_app"
+        android:label="Islamic Quiz"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

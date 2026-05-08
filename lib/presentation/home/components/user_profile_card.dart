@@ -6,8 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:quiz_app/data/providers/auth_providers.dart';
-import 'package:quiz_app/presentation/auth/login.dart';
-import 'package:quiz_app/presentation/profile/profile_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:quiz_app/presentation/router/app_router.dart';
 
 class UserProfileCard extends ConsumerWidget {
   const UserProfileCard({super.key});
@@ -35,10 +35,7 @@ class UserProfileCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
       child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        ),
+        onTap: () => context.go(AppRouter.login),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -74,10 +71,7 @@ class UserProfileCard extends ConsumerWidget {
                 ),
               ),
               TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
+                onPressed: () => context.go(AppRouter.login),
                 child: const Text('Login'),
               ),
             ],
@@ -136,10 +130,7 @@ class UserProfileCard extends ConsumerWidget {
           ),
           elevation: 2,
           child: InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
+            onTap: () => AppRouter.router.push(AppRouter.profile),
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(16),

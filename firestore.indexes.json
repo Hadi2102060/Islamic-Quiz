@@ -1,0 +1,47 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "results",
+            "queryScope": "Collection",
+            "fields": [
+                {
+                    "fieldPath": "category",
+                    "order": "Ascending"
+                },
+                {
+                    "fieldPath": "score",
+                    "order": "Descending"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "results",
+            "queryScope": "Collection",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "Ascending"
+                },
+                {
+                    "fieldPath": "category",
+                    "order": "Ascending"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "results",
+            "queryScope": "Collection",
+            "fields": [
+                {
+                    "fieldPath": "category",
+                    "order": "Ascending"
+                },
+                {
+                    "fieldPath": "score",
+                    "order": "Ascending"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

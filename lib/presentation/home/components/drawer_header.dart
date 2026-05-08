@@ -47,7 +47,7 @@ class DrawerHeaderWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Quiz Quran',
+                      'Islamic Quiz',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,

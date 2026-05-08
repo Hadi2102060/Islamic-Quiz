@@ -10,6 +10,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quiz_app/presentation/router/app_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ImagePicker _picker = ImagePicker();
 
+  static const String _forceOtpPhoneKey = 'forceOtpPhone';
+
   // User data
   String _userId = '';
   String _userName = '';
@@ -32,6 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileImageBase64;
   bool _isLoading = true;
   bool _isLoggedIn = false;
+  String _userPhone = '';
 
   // User statistics
   int _totalQuizzes = 0;
@@ -1010,6 +1015,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
 
+                      // Unsubscribe button
+                      if (_isLoggedIn) ...[
+                        const SizedBox(height: 10),
+                        AnimatedActionButton(
+                          label: 'Unsubscribe',
+                          icon: Icons.cancel_outlined,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF546E7A), Color(0xFF37474F)],
+                          ),
+                          onPressed: _handleUnsubscribe,
+                        ),
+                      ],
+
                       // Guest mode message when not logged in
                       if (!_isLoggedIn)
                         Padding(
@@ -1119,6 +1137,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return 'Unknown';
   }
 
+  Future<http.Response> _postWithJsonFallback(
+    String endpoint,
+    Map<String, String> payload,
+  ) async {
+    final uri = Uri.parse('https://www.flicksize.com/islamic_quiz/$endpoint');
+    final formResponse = await http.post(uri, body: payload);
+    final bodyLower = formResponse.body.toLowerCase();
+    final requiresJson =
+        bodyLower.contains('invalid json payload') ||
+        bodyLower.contains('malformed json') ||
+        bodyLower.contains('expected json');
+
+    if (!requiresJson) return formResponse;
+
+    return http.post(
+      uri,
+      headers: const {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+  }
+
+  bool _isUnsubscribeApiSuccess(
+    Map<String, dynamic> data,
+    String rawBody,
+    int statusCode,
+  ) {
+    final success = data['success'] == true;
+    final apiStatusCode = (data['statusCode'] ?? '').toString().toUpperCase();
+    final status = (data['status'] ?? '').toString().toUpperCase();
+    final message = (data['message'] ?? '').toString().toLowerCase();
+    final raw = rawBody.trim().toLowerCase();
+
+    final hasFailureWord =
+        raw.contains('error') ||
+        raw.contains('failed') ||
+        raw.contains('invalid') ||
+        message.contains('error') ||
+        message.contains('failed') ||
+        message.contains('invalid');
+
+    final plainTextSuccess =
+        raw == '1' ||
+        raw == 'ok' ||
+        raw == 'success' ||
+        raw == 'true' ||
+        raw.contains('unsubscribe successful') ||
+        raw.contains('unsubscription is successful') ||
+        raw.contains('already unsubscribed') ||
+        raw.contains('removed');
+
+    return success ||
+        apiStatusCode.startsWith('S') ||
+        status == 'SUCCESS' ||
+        message.contains('unsubscription is successful') ||
+        message.contains('unsubscribe successful') ||
+        message.contains('already unsubscribed') ||
+        plainTextSuccess ||
+        (statusCode == 200 && raw.isNotEmpty && !hasFailureWord);
+  }
+
+  Future<void> _handleUnsubscribe() async {
+    final prefs = await SharedPreferences.getInstance();
+    final phone = (prefs.getString('userPhone') ?? _userPhone).trim();
+    if (phone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No phone number found')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      http.Response? resp;
+      for (final endpoint in const ['unsubscribe.php', 'unsubscription.php']) {
+        final candidate = await _postWithJsonFallback(endpoint, {
+          'user_mobile': phone,
+        }).timeout(const Duration(seconds: 15));
+        if (candidate.statusCode == 200) {
+          resp = candidate;
+          break;
+        }
+      }
+      if (resp == null) {
+        throw Exception('Unsubscribe endpoint not reachable');
+      }
+
+      Map<String, dynamic> parsed = {};
+      String message = 'Unsubscription successful. Please login again.';
+
+      try {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map<String, dynamic>) {
+          parsed = decoded;
+          if ((decoded['message'] ?? '').toString().trim().isNotEmpty) {
+            message = decoded['message'].toString();
+          }
+
+          // Log the response for debugging
+          print('📡 Unsubscribe response: $decoded');
+        }
+      } catch (_) {}
+
+      final ok = _isUnsubscribeApiSuccess(parsed, resp.body, resp.statusCode);
+      if (!ok) {
+        throw Exception(
+          message == 'Unsubscription successful. Please login again.'
+              ? 'Unsubscribe request failed'
+              : message,
+        );
+      }
+
+      // Set force OTP flag - this will force OTP on next login
+      await prefs.setString(_forceOtpPhoneKey, phone);
+      print('🔐 Force OTP flag set for $phone');
+
+      // Clear saved session
+      await prefs.remove('isLoggedIn');
+      await prefs.remove('userPhone');
+      await prefs.remove('userId');
+
+      // Sign out from Firebase
+      await _auth.signOut();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.black87,
+        ),
+      );
+
+      // Navigate to login page
+      context.go(AppRouter.login);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unsubscribe failed: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    }
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -1153,6 +1324,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() => _isLoading = true);
 
                 try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('isLoggedIn');
+                  await prefs.remove('userPhone');
+                  await prefs.remove('userId');
+
                   await _auth.signOut();
                   if (mounted) {
                     setState(() {
@@ -1168,6 +1344,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _accuracy = 0.0;
                       _isLoading = false;
                     });
+                    context.go(AppRouter.login);
                   }
                 } catch (e) {
                   setState(() => _isLoading = false);

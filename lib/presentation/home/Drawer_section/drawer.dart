@@ -1,14 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_review/in_app_review.dart';
 import 'package:quiz_app/core/providers/sound_provider.dart';
 import 'package:quiz_app/data/providers/auth_providers.dart';
-import 'package:quiz_app/presentation/auth/login.dart';
-import 'package:quiz_app/presentation/profile/profile_screen.dart';
 import 'package:quiz_app/presentation/router/app_router.dart';
 import 'package:quiz_app/services/audio_services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DrawerScreen extends StatefulWidget {
@@ -20,28 +20,6 @@ class DrawerScreen extends StatefulWidget {
 
 class _DrawerScreenState extends State<DrawerScreen>
     with SingleTickerProviderStateMixin {
-  Future<void> _requestAppReview() async {
-    final InAppReview inAppReview = InAppReview.instance;
-
-    if (await inAppReview.isAvailable()) {
-      // Native রিভিউ ডায়ালগ দেখাবে (Android/iOS-এ যেখানে সম্ভব)
-      await inAppReview.requestReview();
-    } else {
-      // Fallback: সরাসরি Play Store / App Store-এ নিয়ে যাবে
-      const String playStoreUrl =
-          'https://play.google.com/store/apps/details?id=com.yourcompany.yourapp&showAllReviews=true';
-      // iOS-এর জন্য: 'https://apps.apple.com/app/id{YOUR_APPLE_ID}?action=write-review'
-
-      final Uri url = Uri.parse(playStoreUrl);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        // কোনো এরর হলে SnackBar দেখাতে পারো
-        print('Could not launch $playStoreUrl');
-      }
-    }
-  }
-
   Future<void> _openContactEmail() async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
@@ -382,13 +360,164 @@ class _DrawerScreenState extends State<DrawerScreen>
 
         return authAsync.when(
           data: (User? user) {
-            if (user == null) {
-              // ─── Not logged in ───────────────────────────────
-              return _buildGuestProfileCard(context);
-            } else {
-              // ─── Logged in ───────────────────────────────────
-              return _buildLoggedInProfileCard(context, user);
-            }
+            // If FirebaseAuth user exists, show email-auth card.
+            if (user != null) return _buildLoggedInProfileCard(context, user);
+
+            // Otherwise, check SharedPreferences phone-based login.
+            return FutureBuilder<SharedPreferences>(
+              future: SharedPreferences.getInstance(),
+              builder: (context, snap) {
+                if (!snap.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  );
+                }
+
+                final prefs = snap.data!;
+                final phone = prefs.getString('userPhone')?.trim() ?? '';
+                final userId =
+                    (prefs.getString('userId')?.trim().isNotEmpty == true)
+                    ? prefs.getString('userId')!.trim()
+                    : phone.replaceAll(RegExp(r'[^0-9]'), '');
+
+                // No phone saved -> true guest.
+                if (phone.isEmpty) return _buildGuestProfileCard(context);
+
+                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(userId)
+                      .snapshots(),
+                  builder: (context, userSnap) {
+                    final data = userSnap.data?.data() ?? <String, dynamic>{};
+
+                    final name = (data['name'] ?? 'Unknown User').toString();
+                    final email = (data['email'] ?? 'Unknown').toString();
+                    final profileCompleted = data['profileCompleted'] == true;
+
+                    return InkWell(
+                      onTap: () {
+                        if (profileCompleted) {
+                          AppRouter.router.push(AppRouter.profile);
+                          return;
+                        }
+
+                        context.go(AppRouter.profile);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF0B6B3A).withOpacity(0.12),
+                              Colors.white,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF0B6B3A).withOpacity(0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF0B6B3A),
+                                    Color(0xFF1B9C5A),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.person_outline_rounded,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 17,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (!profileCompleted)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withOpacity(
+                                              0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.amber.withOpacity(
+                                                0.35,
+                                              ),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Complete',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF8A5A00),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    email == 'Unknown' ? phone : email,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              profileCompleted
+                                  ? Icons.chevron_right
+                                  : Icons.edit,
+                              color: const Color(0xFF0B6B3A),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
           },
           loading: () =>
               const Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -402,10 +531,7 @@ class _DrawerScreenState extends State<DrawerScreen>
   Widget _buildGuestProfileCard(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+        context.go(AppRouter.login);
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -460,12 +586,7 @@ class _DrawerScreenState extends State<DrawerScreen>
               child: InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
+                  context.go(AppRouter.login);
                 },
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -495,10 +616,7 @@ class _DrawerScreenState extends State<DrawerScreen>
     return InkWell(
       onTap: () {
         // Go to full profile screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
-        );
+        AppRouter.router.push(AppRouter.profile);
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -745,12 +863,12 @@ class _DrawerScreenState extends State<DrawerScreen>
             childAspectRatio: 1.5,
             children: [
               _buildGridActionItem(
-                icon: Icons.star_border,
-                label: 'Rate Us',
-                color: Colors.amber,
-                onTap: () async {
-                  Navigator.of(context).pop(); // bottom sheet / dialog বন্ধ
-                  await _requestAppReview(); // রেটিং ফ্লো
+                icon: Icons.help_outline,
+                label: 'Help',
+                color: Colors.blue.shade700,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  AppRouter.router.go(AppRouter.help); // সাহায্য স্ক্রিনে যান
                 },
               ),
               _buildGridActionItem(

@@ -12,7 +12,7 @@ class AudioService {
   Future<void> init() async {
     if (_initialized) return;
     try {
-      await _player.setAsset('assets/audio/hadi.mp3');
+      await _player.setAsset('assets/audio/islamic_song.mp3');
       await _player.setLoopMode(LoopMode.all);
       await _player.setVolume(0.4);
       _initialized = true;

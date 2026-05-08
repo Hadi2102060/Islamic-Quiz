@@ -1,494 +1,600 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:quiz_app/presentation/router/app_router.dart';
+import 'package:quiz_app/data/providers/session_user_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-class DetailedStatsScreen extends StatelessWidget {
+class DetailedStatsScreen extends ConsumerWidget {
   const DetailedStatsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return WillPopScope(
-      onWillPop: () async {
-        // `go()` navigation uses route replacement, so `pop()` won't go back.
-        // Always route back to the stats screen.
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userIdAsync = ref.watch(sessionUserIdProvider);
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
         AppRouter.router.go(AppRouter.stats);
-        return false;
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Stack(
           children: [
-          AnimatedContainer(
-            duration: const Duration(seconds: 4),
-            curve: Curves.easeInOut,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF071B2F),
-                  Color(0xFF073E3A),
-                  Color(0xFF0A4D4A),
-                ],
-                stops: [0.0, 0.6, 1.0],
-              ),
-            ),
-          ),
-
-          Positioned(
-            left: -40,
-            bottom: -30,
-            child: Opacity(
-              opacity: 0.14,
-              child: SizedBox(
-                width: 240,
-                height: 240,
-                child: Lottie.asset(
-                  'assets/lottie_files/Islamic_shape.json',
-                  repeat: true,
+            AnimatedContainer(
+              duration: const Duration(seconds: 4),
+              curve: Curves.easeInOut,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF071B2F),
+                    Color(0xFF073E3A),
+                    Color(0xFF0A4D4A),
+                  ],
+                  stops: [0.0, 0.6, 1.0],
                 ),
               ),
             ),
-          ),
-
-          ...List.generate(
-            5,
-            (i) => Positioned(
-              left: (i * 65.0) % 380,
-              top: (i * 95.0) % 720,
-              child:
-                  Container(
-                        width: 3,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 900.ms, delay: (i * 150).ms)
-                      .shimmer(duration: 2500.ms, color: Colors.white30)
-                      .then()
-                      .moveY(
-                        begin: 0,
-                        end: 22,
-                        duration: 3800.ms,
-                        curve: Curves.easeInOut,
-                      )
-                      .animate(onPlay: (c) => c.repeat(reverse: true)),
+            Positioned(
+              left: -40,
+              bottom: -30,
+              child: Opacity(
+                opacity: 0.14,
+                child: SizedBox(
+                  width: 240,
+                  height: 240,
+                  child: Lottie.asset(
+                    'assets/lottie_files/Islamic_shape.json',
+                    repeat: true,
+                  ),
+                ),
+              ),
             ),
-          ),
-
-          SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 60),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Material(
-                        color: Colors.white12,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: InkWell(
-                          onTap: () => AppRouter.router.go(AppRouter.stats),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            child: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                              size: 22,
-                            ),
+            ...List.generate(
+              5,
+              (i) => Positioned(
+                left: (i * 65.0) % 380,
+                top: (i * 95.0) % 720,
+                child:
+                    Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                      ).animate().scale(
-                        duration: 300.ms,
-                        curve: Curves.easeOutBack,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child:
-                            Text(
-                                  'Detailed Analytics',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.6,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                                .animate()
-                                .fadeIn(duration: 500.ms)
-                                .slideX(begin: -0.25, end: 0),
-                      ),
-                    ],
+                        )
+                        .animate()
+                        .fadeIn(duration: 900.ms, delay: (i * 150).ms)
+                        .shimmer(duration: 2500.ms, color: Colors.white30)
+                        .then()
+                        .moveY(
+                          begin: 0,
+                          end: 22,
+                          duration: 3800.ms,
+                          curve: Curves.easeInOut,
+                        )
+                        .animate(onPlay: (c) => c.repeat(reverse: true)),
+              ),
+            ),
+            SafeArea(
+              child: userIdAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
                   ),
-
-                  const SizedBox(height: 28),
-
-                  if (user == null)
-                    Center(
-                      child: Text(
-                        'Sign in to see your detailed analytics',
-                        style: GoogleFonts.inter(color: Colors.white70),
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  else
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('results')
-                          .where('userId', isEqualTo: user.uid)
-                          .snapshots(),
-                      builder: (context, resultsSnap) {
-                        if (resultsSnap.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 18),
-                              child: CircularProgressIndicator(
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.amber),
-                              ),
-                            ),
-                          );
-                        }
-
-                        final resultDocs = resultsSnap.data?.docs ?? [];
-                        int totalQuestions = 0;
-                        int correctAnswers = 0;
-                        int bestPercent = 0;
-                        final categoriesPlayed = <String>{};
-
-                        for (final d in resultDocs) {
-                          final data = d.data() as Map<String, dynamic>;
-                          final tq = (data['totalQuestions'] ?? 0) as int;
-                          final ca = (data['correctAnswers'] ?? 0) as int;
-                          final p = (data['percentage'] ?? 0) as int;
-                          totalQuestions += tq;
-                          correctAnswers += ca;
-                          if (p > bestPercent) bestPercent = p;
-                          categoriesPlayed.add(
-                            (data['categoryTitle'] ?? data['category'] ?? '')
-                                .toString(),
-                          );
-                        }
-
-                        final avgAccuracy = totalQuestions > 0
-                            ? (correctAnswers / totalQuestions).clamp(0.0, 1.0)
-                            : 0.0;
-
-                        final quizEntries = resultDocs.map((d) {
-                          final data = d.data() as Map<String, dynamic>;
-                          return {
-                            'title':
-                                (data['categoryTitle'] ?? data['category'] ?? '')
-                                    .toString(),
-                            'score': (data['percentage'] ?? 0) as int,
-                            'date': _formatDate(data['timestamp']),
-                          };
-                        }).toList();
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                  Text(
-                    'Overall Stats',
-                    style: GoogleFonts.inter(
-                      color: Colors.white70,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                ),
+                error: (err, stack) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'ত্রুটি: $err',
+                      style: GoogleFonts.inter(color: Colors.white70),
+                      textAlign: TextAlign.center,
                     ),
-                  ).animate().fadeIn(delay: 200.ms),
-
-                  const SizedBox(height: 15),
-
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio:
-                        1.55, // right overflow fix – এখানে মূল পরিবর্তন
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    children: [
-                      _AnimatedStatCard(
-                        title: 'Total Questions',
-                        value: '$totalQuestions',
-                        icon: Icons.menu_book,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1DE9B6), Color(0xFF00BFA5)],
-                        ),
-                        accentColor: Colors.tealAccent,
-                        trend: 'Live',
-                      ),
-                      _AnimatedStatCard(
-                        title: 'Correct Answers',
-                        value: '$correctAnswers',
-                        icon: Icons.check_circle_outline,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFD54F), Color(0xFFFFA000)],
-                        ),
-                        accentColor: Colors.amber,
-                        trend: '${(avgAccuracy * 100).round()}%',
-                      ),
-                      _AnimatedStatCard(
-                        title: 'Categories Played',
-                        value: '${categoriesPlayed.where((e) => e.isNotEmpty).length}',
-                        icon: Icons.category_outlined,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFBA68C8), Color(0xFF9C27B0)],
-                        ),
-                        accentColor: Colors.purpleAccent,
-                        trend: 'unique',
-                      ),
-                      _AnimatedStatCard(
-                        title: 'Best Score',
-                        value: '$bestPercent%',
-                        icon: Icons.emoji_events_outlined,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4FC3F7), Color(0xFF03A9F4)],
-                        ),
-                        accentColor: Colors.lightBlueAccent,
-                        trend: 'best',
-                      ),
-                    ],
                   ),
-
-                  const SizedBox(height: 36),
-
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1.5,
-                      ),
-                    ),
+                ),
+                data: (userId) {
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 60),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withOpacity(0.25),
-                                borderRadius: BorderRadius.circular(10),
+                            Material(
+                              color: Colors.white12,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
-                                Icons.trending_up_rounded,
-                                color: Colors.amber,
-                                size: 20,
+                              child: InkWell(
+                                onTap: () =>
+                                    AppRouter.router.go(AppRouter.stats),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  child: const Icon(
+                                    Icons.arrow_back,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
                               ),
+                            ).animate().scale(
+                              duration: 300.ms,
+                              curve: Curves.easeOutBack,
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Overall Performance',
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child:
+                                  Text(
+                                        'Detailed Analytics',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      )
+                                      .animate()
+                                      .fadeIn(duration: 500.ms)
+                                      .slideX(begin: -0.25, end: 0),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: _AnimatedCircularProgress(
-                            value: avgAccuracy,
-                            label: 'Avg Accuracy',
-                            gradient: const LinearGradient(
-                              colors: [Colors.amber, Colors.orange],
+                        const SizedBox(height: 28),
+                        if (userId == null)
+                          Center(
+                            child: Text(
+                              'Sign in to see your detailed analytics',
+                              style: GoogleFonts.inter(color: Colors.white70),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Quiz History',
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Last 30 Days',
-                          style: GoogleFonts.inter(
-                            color: Colors.greenAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(user.uid)
-                        .collection('activities')
-                        .orderBy('timestamp', descending: true)
-                        .limit(8)
-                        .snapshots(),
-                    builder: (context, actSnap) {
-                      final docs = actSnap.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return Text(
-                          'No history yet',
-                          style: GoogleFonts.inter(color: Colors.white54),
-                        );
-                      }
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 18,
-                          crossAxisSpacing: 18,
-                          childAspectRatio: 0.90,
-                        ),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final data = docs[index].data() as Map<String, dynamic>;
-                          final percent = (data['score'] ?? 0) as int;
-                          final title = (data['title'] ?? 'Quiz').toString();
-                          final ts = data['timestamp'];
-                          final date = _formatDate(ts);
-
-                          final quizData = {
-                            'num': index + 1,
-                            'percent': percent,
-                            'date': date,
-                            'improving': index == 0,
-                            'title': title,
-                          };
-
-                          return _AnimatedQuizCard(
-                            quizNum: index + 1,
-                            percent: percent,
-                            date: date,
-                            isImproving: index == 0,
-                            onTap: () => _showQuizDetailDialog(context, quizData),
                           )
-                              .animate()
-                              .fadeIn(delay: (index * 60).ms)
-                              .scale(
-                                begin: const Offset(0.85, 0.85),
-                                curve: Curves.easeOutBack,
+                        else
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('results')
+                                .where('userId', isEqualTo: userId)
+                                .snapshots(),
+                            builder: (context, resultsSnap) {
+                              if (resultsSnap.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: 18),
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.amber,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              if (resultsSnap.hasError) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text(
+                                      'ত্রুটি: ${resultsSnap.error}',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white70,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final resultDocs = resultsSnap.data?.docs ?? [];
+                              int totalQuestions = 0;
+                              int correctAnswers = 0;
+                              int bestPercent = 0;
+                              final categoriesPlayed = <String>{};
+
+                              for (final d in resultDocs) {
+                                final data = d.data() as Map<String, dynamic>;
+                                final tq = ((data['totalQuestions'] ?? 0) as num).toInt();
+                                final caRaw = data['correctAnswers'] ?? data['score'] ?? 0;
+                                final ca = (caRaw as num).toInt();
+                                final p = ((data['percentage'] ?? 0) as num).toInt();
+                                totalQuestions += tq;
+                                correctAnswers += ca;
+                                if (p > bestPercent) bestPercent = p;
+                                categoriesPlayed.add(
+                                  (data['categoryTitle'] ??
+                                          data['category'] ??
+                                          '')
+                                      .toString(),
+                                );
+                              }
+
+                              final avgAccuracy = totalQuestions > 0
+                                  ? (correctAnswers / totalQuestions).clamp(
+                                      0.0,
+                                      1.0,
+                                    )
+                                  : 0.0;
+
+                              final quizEntries = resultDocs.map((d) {
+                                final data = d.data() as Map<String, dynamic>;
+                                final rawTs =
+                                    data['updatedAt'] ?? data['timestamp'];
+                                return {
+                                  'title':
+                                      (data['categoryTitle'] ??
+                                              data['category'] ??
+                                              '')
+                                          .toString(),
+                                  'score': ((data['percentage'] ?? 0) as num).toInt(),
+                                  'date': _formatDate(rawTs),
+                                };
+                              }).toList();
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Overall Stats',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white70,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ).animate().fadeIn(delay: 200.ms),
+                                  const SizedBox(height: 15),
+                                  GridView.count(
+                                    crossAxisCount: 2,
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    mainAxisSpacing: 10,
+                                    crossAxisSpacing: 10,
+                                    childAspectRatio: 1.55,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    children: [
+                                      _AnimatedStatCard(
+                                        title: 'Total Questions',
+                                        value: '$totalQuestions',
+                                        icon: Icons.menu_book,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF1DE9B6),
+                                            Color(0xFF00BFA5),
+                                          ],
+                                        ),
+                                        accentColor: Colors.tealAccent,
+                                        trend: 'Live',
+                                      ),
+                                      _AnimatedStatCard(
+                                        title: 'Correct Answers',
+                                        value: '$correctAnswers',
+                                        icon: Icons.check_circle_outline,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFFFD54F),
+                                            Color(0xFFFFA000),
+                                          ],
+                                        ),
+                                        accentColor: Colors.amber,
+                                        trend:
+                                            '${(avgAccuracy * 100).round()}%',
+                                      ),
+                                      _AnimatedStatCard(
+                                        title: 'Categories Played',
+                                        value:
+                                            '${categoriesPlayed.where((e) => e.isNotEmpty).length}',
+                                        icon: Icons.category_outlined,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFBA68C8),
+                                            Color(0xFF9C27B0),
+                                          ],
+                                        ),
+                                        accentColor: Colors.purpleAccent,
+                                        trend: 'unique',
+                                      ),
+                                      _AnimatedStatCard(
+                                        title: 'Best Score',
+                                        value: '$bestPercent%',
+                                        icon: Icons.emoji_events_outlined,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF4FC3F7),
+                                            Color(0xFF03A9F4),
+                                          ],
+                                        ),
+                                        accentColor: Colors.lightBlueAccent,
+                                        trend: 'best',
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 36),
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.1),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.withOpacity(
+                                                  0.25,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: const Icon(
+                                                Icons.trending_up_rounded,
+                                                color: Colors.amber,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              'Overall Performance',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 24),
+                                        Center(
+                                          child: _AnimatedCircularProgress(
+                                            value: avgAccuracy,
+                                            label: 'Avg Accuracy',
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Colors.amber,
+                                                Colors.orange,
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 36),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Quiz History',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Last 30 Days',
+                                          style: GoogleFonts.inter(
+                                            color: Colors.greenAccent,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  StreamBuilder<QuerySnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(userId)
+                                        .collection('activities')
+                                        .orderBy('timestamp', descending: true)
+                                        .limit(8)
+                                        .snapshots(),
+                                    builder: (context, actSnap) {
+                                      if (actSnap.connectionState ==
+                                          ConnectionState.waiting) {
+                                        return const Center(
+                                          child: CircularProgressIndicator(
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.amber,
+                                                ),
+                                          ),
+                                        );
+                                      }
+
+                                      if (actSnap.hasError) {
+                                        return Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            child: Text(
+                                              'ত্রুটি: ${actSnap.error}',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white70,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        );
+                                      }
+
+                                      final docs = actSnap.data?.docs ?? [];
+                                      if (docs.isEmpty) {
+                                        return Text(
+                                          'No history yet',
+                                          style: GoogleFonts.inter(
+                                            color: Colors.white54,
+                                          ),
+                                        );
+                                      }
+
+                                      return GridView.builder(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        gridDelegate:
+                                            const SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: 2,
+                                              mainAxisSpacing: 18,
+                                              crossAxisSpacing: 18,
+                                              childAspectRatio: 0.90,
+                                            ),
+                                        itemCount: docs.length,
+                                        itemBuilder: (context, index) {
+                                          final data =
+                                              docs[index].data()
+                                                  as Map<String, dynamic>;
+                                          final percent =
+                                              ((data['score'] ?? 0) as num).toInt();
+                                          final title =
+                                              (data['title'] ?? 'Quiz')
+                                                  .toString();
+                                          final ts = data['timestamp'];
+                                          final date = _formatDate(ts);
+
+                                          final quizData = {
+                                            'num': index + 1,
+                                            'percent': percent,
+                                            'date': date,
+                                            'improving': index == 0,
+                                            'title': title,
+                                          };
+
+                                          return _AnimatedQuizCard(
+                                                quizNum: index + 1,
+                                                percent: percent,
+                                                date: date,
+                                                isImproving: index == 0,
+                                                onTap: () =>
+                                                    _showQuizDetailDialog(
+                                                      context,
+                                                      quizData,
+                                                    ),
+                                              )
+                                              .animate()
+                                              .fadeIn(delay: (index * 60).ms)
+                                              .scale(
+                                                begin: const Offset(0.85, 0.85),
+                                                curve: Curves.easeOutBack,
+                                              );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 48),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                      horizontal: 20,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFFD54F),
+                                          Color(0xFFFFB74D),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.amber.withOpacity(0.4),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: _AnimatedActionButton(
+                                      onPressed: () async {
+                                        try {
+                                          await _exportFullReport(
+                                            context: context,
+                                            totalQuestions: totalQuestions,
+                                            correctAnswers: correctAnswers,
+                                            bestPercent: bestPercent,
+                                            avgAccuracy: avgAccuracy,
+                                            quizEntries: quizEntries,
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                '📄 PDF report generated & opened!',
+                                              ),
+                                              backgroundColor: Color(
+                                                0xFF1B5E20,
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.all(
+                                                  Radius.circular(16),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Failed to generate PDF: $e',
+                                              ),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      label: 'Export Full Report',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 80),
+                                ],
                               );
-                        },
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 48),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 20,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD54F), Color(0xFFFFB74D)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.amber.withOpacity(0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
+                            },
+                          ),
                       ],
                     ),
-                    child: _AnimatedActionButton(
-                      onPressed: () async {
-                        try {
-                          await _exportFullReport(
-                            context: context,
-                            totalQuestions: totalQuestions,
-                            correctAnswers: correctAnswers,
-                            bestPercent: bestPercent,
-                            avgAccuracy: avgAccuracy,
-                            quizEntries: quizEntries,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('📄 PDF report generated & opened!'),
-                              backgroundColor: Color(0xFF1B5E20),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(16),
-                                ),
-                              ),
-                            ),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to generate PDF: $e'),
-                              backgroundColor: Colors.redAccent,
-                            ),
-                          );
-                        }
-                      },
-                      label: 'Export Full Report',
-                    ),
-                  ),
-
-                  const SizedBox(height: 80),
-                ],
-              );
-                      },
-                    ),
-                  ],
+                  );
+                },
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -503,7 +609,9 @@ class DetailedStatsScreen extends StatelessWidget {
   }) async {
     final doc = pw.Document();
 
-    final accuracyPercent = (avgAccuracy * 100).clamp(0, 100).toStringAsFixed(1);
+    final accuracyPercent = (avgAccuracy * 100)
+        .clamp(0, 100)
+        .toStringAsFixed(1);
 
     doc.addPage(
       pw.MultiPage(
@@ -512,10 +620,7 @@ class DetailedStatsScreen extends StatelessWidget {
             level: 0,
             child: pw.Text(
               'Quiz Detailed Report',
-              style: pw.TextStyle(
-                fontSize: 24,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
             ),
           ),
           pw.SizedBox(height: 8),
@@ -526,31 +631,17 @@ class DetailedStatsScreen extends StatelessWidget {
           pw.SizedBox(height: 16),
           pw.Text(
             'Overview',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
-          pw.Bullet(
-            text: 'Total questions attempted: $totalQuestions',
-          ),
-          pw.Bullet(
-            text: 'Correct answers: $correctAnswers',
-          ),
-          pw.Bullet(
-            text: 'Best score: $bestPercent%',
-          ),
-          pw.Bullet(
-            text: 'Average accuracy: $accuracyPercent%',
-          ),
+          pw.Bullet(text: 'Total questions attempted: $totalQuestions'),
+          pw.Bullet(text: 'Correct answers: $correctAnswers'),
+          pw.Bullet(text: 'Best score: $bestPercent%'),
+          pw.Bullet(text: 'Average accuracy: $accuracyPercent%'),
           pw.SizedBox(height: 16),
           pw.Text(
             'Recent quiz history',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           if (quizEntries.isEmpty)
@@ -591,7 +682,7 @@ class DetailedStatsScreen extends StatelessWidget {
   static String _formatDate(dynamic ts) {
     if (ts is Timestamp) {
       final d = ts.toDate();
-      final m = [
+      const months = [
         'Jan',
         'Feb',
         'Mar',
@@ -603,9 +694,26 @@ class DetailedStatsScreen extends StatelessWidget {
         'Sep',
         'Oct',
         'Nov',
-        'Dec'
-      ][d.month - 1];
-      return '$m ${d.day}';
+        'Dec',
+      ];
+      return '${months[d.month - 1]} ${d.day}';
+    }
+    if (ts is DateTime) {
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${months[ts.month - 1]} ${ts.day}';
     }
     return '';
   }
@@ -614,7 +722,6 @@ class DetailedStatsScreen extends StatelessWidget {
     BuildContext context,
     Map<String, dynamic> quizData,
   ) {
-    // unchanged – আগের মতোই রাখা
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -722,10 +829,7 @@ class DetailedStatsScreen extends StatelessWidget {
   }
 }
 
-// ────────────────────────────────────────────────
-//  Custom Widgets (all defined here)
-// ────────────────────────────────────────────────
-
+// Custom Widgets
 class _AnimatedStatCard extends StatefulWidget {
   final String title;
   final String value;
@@ -761,7 +865,7 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard>
                 clipBehavior: Clip.hardEdge,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.all(12), // একটু কমানো হয়েছে
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   gradient: _isHovered
                       ? LinearGradient(
@@ -796,11 +900,7 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard>
                         color: Colors.white.withOpacity(0.25),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        widget.icon,
-                        color: Colors.white,
-                        size: 20,
-                      ), // size কমানো
+                      child: Icon(widget.icon, color: Colors.white, size: 20),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -809,7 +909,6 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           FittedBox(
-                            // ← title text auto-scale হবে
                             fit: BoxFit.scaleDown,
                             child: Text(
                               widget.title,
@@ -831,7 +930,7 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard>
                                   child: Text(
                                     widget.value,
                                     style: GoogleFonts.montserrat(
-                                      fontSize: 18, // একটু ছোট করা
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w800,
                                       color: Colors.white,
                                     ),
@@ -980,7 +1079,6 @@ class _GradientCircularProgressPainter extends CustomPainter {
     final radius = size.width / 2 - 8;
     const stroke = 11.0;
 
-    // Background
     canvas.drawCircle(
       center,
       radius,
@@ -990,7 +1088,6 @@ class _GradientCircularProgressPainter extends CustomPainter {
         ..strokeWidth = stroke,
     );
 
-    // Progress arc
     final rect = Rect.fromCircle(center: center, radius: radius);
     final shader = gradient.createShader(rect);
     canvas.drawArc(

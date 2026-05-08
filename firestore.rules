@@ -1,0 +1,123 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ====================== HELPER FUNCTIONS ======================
+    
+    function signedIn() {
+      return request.auth != null;
+    }
+    
+    function isPhoneDocId(docId) {
+      return docId.matches('^01[0-9]{9}$');
+    }
+    
+    function isDeterministicPhoneAuth(docId) {
+      return signedIn()
+          && (request.auth.token.email is string)
+          && request.auth.token.email == (docId + '@islamic-quiz.local');
+    }
+    
+    function isOwner(docId) {
+      return signedIn() && (
+        request.auth.uid == docId 
+        || isDeterministicPhoneAuth(docId)
+      );
+    }
+    
+    function phonePayloadMatchesDocId(docId) {
+      return (request.resource.data.phoneNumber is string)
+          && request.resource.data.phoneNumber == docId;
+    }
+    
+    function allowedPhoneProfileKeys() {
+      return request.resource.data.keys().hasOnly([
+        'uid', 'phoneNumber', 'authMethod', 'name', 'email',
+        'profileImageBase64', 'profileCompleted', 'isSkipped',
+        'createdAt', 'updatedAt', 'lastActive', 'photo', 'photoUrl'
+      ]);
+    }
+    
+    // ====================== USERS COLLECTION ======================
+    // পড়ুন: যে কেউ লগইন করা ছাড়িয়ে যেতে পারে
+    // লিডারবোর্ডের জন্য সব ব্যবহারকারীর ফটো দেখতে পারবে
+    
+    match /users/{docId} {
+      
+      // READ: Anyone can read (for leaderboard photos)
+      allow read: if true;
+      
+      // CREATE: Only allow creation (prevent mass-creating other user documents)
+      allow create: if signedIn();
+      
+      // UPDATE: Any signed-in user can update user documents
+      // (App uses anonymous auth + SharedPrefs for userId, so ownership checks don't work)
+      allow update: if signedIn();
+      
+      // DELETE: Prevent deletion
+      allow delete: if false;
+      
+      // ACTIVITIES SUBCOLLECTION (for quiz scores)
+      match /activities/{activityId} {
+        allow read: if true;
+        allow create, update: if true;  // Temporarily public for testing
+        allow delete: if false;
+      }
+      
+      // ACHIEVEMENTS SUBCOLLECTION
+      match /achievements/{achievementId} {
+        allow read: if true;
+        allow create, update: if true;  // Temporarily public for testing
+        allow delete: if false;
+      }
+      
+      // OTHER SUBCOLLECTIONS
+      match /{subPath=**} {
+        allow read: if true;
+        allow write: if signedIn();
+      }
+    }
+    
+    // ====================== RESULTS COLLECTION ======================
+    // পড়ুন: সবাই দেখতে পারে (লিডারবোর্ডের জন্য)
+    
+    match /results/{docId} {
+      allow read: if true;                                  // Everyone can read leaderboard
+      allow create, update: if true;                        // Temporarily public for testing
+      allow delete: if false;                               // No one can delete
+    }
+    
+    // ====================== LEADERBOARD COLLECTION ======================
+    // পড়ুন: সবাই দেখতে পারবে
+    
+    match /leaderboard/{docId} {
+      allow read: if true;                                  // সবাই লিডারবোর্ড দেখতে পাবে
+      allow create, update: if true;                        // Temporarily public for testing
+      allow delete: if false;                               // কেউ ডিলিট করতে পারবে না
+    }
+    
+    // ====================== SETTINGS COLLECTION ======================
+    // শুধুমাত্র পড়া যাবে, সবার জন্য (অ্যাডমিন সেটিংস)
+    
+    match /settings/{docId} {
+      allow read: if true;                                  // সবাই সেটিংস দেখতে পাবে
+      allow write: if false;                                // শুধু Firebase Console থেকে এডিট করা যাবে
+    }
+    
+    // ====================== QUIZZES COLLECTION ======================
+    // সবাই প্রশ্ন পড়তে পারবে
+    
+    match /quizzes/{docId} {
+      allow read: if true;                                  // কুইজ প্রশ্ন সবাই দেখতে পাবে
+      allow write: if false;                                // শুধু অ্যাডমিন/Firebase Console থেকে এডিট করবেন
+    }
+    
+    // ====================== QUESTIONS COLLECTION ======================
+    
+    match /questions/{docId} {
+      allow read: if true;                                  // সবাই প্রশ্ন দেখতে পাবে
+      allow write: if false;                                // শুধু Firebase থেকে এডিট করা যাবে
+    }
+  }
+}

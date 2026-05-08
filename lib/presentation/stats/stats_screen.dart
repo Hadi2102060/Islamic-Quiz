@@ -1,393 +1,537 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:quiz_app/presentation/router/app_router.dart';
 import 'package:quiz_app/presentation/widgets/stats_background.dart';
+import 'package:quiz_app/data/providers/session_user_provider.dart';
 
-class StatsScreen extends StatelessWidget {
+class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userIdAsync = ref.watch(sessionUserIdProvider);
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
-        // Navigation history may not exist depending on how we arrived here.
-        // Always route back to Home to guarantee expected behavior.
         AppRouter.router.go(AppRouter.home);
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: StatsBackground(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+          child: SafeArea(
+            child: userIdAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
+              ),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'ত্রুটি: $err',
+                    style: GoogleFonts.inter(color: Colors.white70),
+                    textAlign: TextAlign.center,
                   ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                          // Header
-                          Row(
+                ),
+              ),
+              data: (userId) {
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Material(
-                                color: Colors.white12,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: InkWell(
-                                  onTap: () => AppRouter.router.go(AppRouter.home),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    child: const Icon(
-                                      Icons.arrow_back,
-                                      color: Colors.white,
-                                      size: 20, // Fixed icon size
+                              // Header
+                              Row(
+                                children: [
+                                  Material(
+                                    color: Colors.white12,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: InkWell(
+                                      onTap: () =>
+                                          AppRouter.router.go(AppRouter.home),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        child: const Icon(
+                                          Icons.arrow_back,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ).animate().scale(
+                                    duration: 300.ms,
+                                    curve: Curves.easeOutBack,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child:
+                                        Text(
+                                              'Statistics',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.5,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            )
+                                            .animate()
+                                            .fadeIn(
+                                              duration: 500.ms,
+                                              delay: 100.ms,
+                                            )
+                                            .slideX(begin: -0.2, end: 0),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (userId == null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 24),
+                                  child: Center(
+                                    child: Text(
+                                      'Sign in to see your statistics',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white70,
+                                      ),
                                     ),
                                   ),
+                                )
+                              else
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('results')
+                                      .where('userId', isEqualTo: userId)
+                                      .limit(50)
+                                      .snapshots(),
+                                  builder: (context, activitySnap) {
+                                    if (activitySnap.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                        child: CircularProgressIndicator(
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.amber,
+                                              ),
+                                        ),
+                                      );
+                                    }
+
+                                    if (activitySnap.hasError) {
+                                      return Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                          ),
+                                          child: Text(
+                                            'ত্রুটি: ${activitySnap.error}',
+                                            style: GoogleFonts.inter(
+                                              color: Colors.white70,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    final activityDocs =
+                                        activitySnap.data?.docs ?? [];
+
+                                    // ✅ Client-side sorting by updatedAt (newest first)
+                                    activityDocs.sort((a, b) {
+                                      final aData =
+                                          a.data() as Map<String, dynamic>;
+                                      final bData =
+                                          b.data() as Map<String, dynamic>;
+
+                                      final aTime = aData['updatedAt'];
+                                      final bTime = bData['updatedAt'];
+
+                                      if (aTime is Timestamp &&
+                                          bTime is Timestamp) {
+                                        return bTime.compareTo(aTime);
+                                      }
+                                      return 0;
+                                    });
+
+                                    final totalQuizzes = activityDocs.length;
+
+                                    final scores = activityDocs.map((d) {
+                                      final data =
+                                          d.data() as Map<String, dynamic>;
+                                      final percentage = data['percentage'];
+                                      if (percentage != null) {
+                                        return (percentage as num).toDouble();
+                                      }
+                                      final score = data['score'];
+                                      final total = data['total'];
+                                      if (score != null &&
+                                          total != null &&
+                                          total > 0) {
+                                        return (score as num).toDouble() /
+                                            (total as num).toDouble() *
+                                            100.0;
+                                      }
+                                      return 0.0;
+                                    }).toList();
+
+                                    final avgScore = scores.isEmpty
+                                        ? 0.0
+                                        : scores.reduce((a, b) => a + b) /
+                                              scores.length;
+                                    final bestScore = scores.isEmpty
+                                        ? 0
+                                        : scores
+                                              .reduce((a, b) => a > b ? a : b)
+                                              .round();
+
+                                    final recent = activityDocs
+                                        .take(5)
+                                        .toList();
+
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        // Summary cards
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: _AnimatedStatCard(
+                                                title: 'Total Quizzes',
+                                                value: '$totalQuizzes',
+                                                icon: Icons.quiz_outlined,
+                                                gradient: const LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    Color(0xFFFFD54F),
+                                                    Color(0xFFFFA000),
+                                                  ],
+                                                ),
+                                                accentColor: Colors.amber,
+                                                trend: totalQuizzes > 0
+                                                    ? 'Live'
+                                                    : '0',
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: _AnimatedStatCard(
+                                                title: 'Best Score',
+                                                value: '$bestScore%',
+                                                icon:
+                                                    Icons.emoji_events_outlined,
+                                                gradient: const LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    Color(0xFF1DE9B6),
+                                                    Color(0xFF00BFA5),
+                                                  ],
+                                                ),
+                                                accentColor: Colors.tealAccent,
+                                                trend: 'Best',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Circular progress with accuracy
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.05,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(
+                                                0.1,
+                                              ),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.all(6),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.amber
+                                                          .withOpacity(0.2),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.trending_up_rounded,
+                                                      color:
+                                                          Colors.amber.shade200,
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Performance',
+                                                    style: GoogleFonts.inter(
+                                                      color: Colors.white,
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Center(
+                                                child:
+                                                    _AnimatedCircularProgress(
+                                                      value: (avgScore / 100)
+                                                          .clamp(0.0, 1.0),
+                                                      label: 'Avg Accuracy',
+                                                      gradient:
+                                                          const LinearGradient(
+                                                            colors: [
+                                                              Colors.amber,
+                                                              Colors.orange,
+                                                            ],
+                                                          ),
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Recent Scores Section
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.05,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(
+                                                0.1,
+                                              ),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    'Recent Scores',
+                                                    style: GoogleFonts.inter(
+                                                      color: Colors.white,
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green
+                                                          .withOpacity(0.2),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      'Last 5',
+                                                      style: GoogleFonts.inter(
+                                                        color:
+                                                            Colors.greenAccent,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 12),
+                                              if (recent.isEmpty)
+                                                Text(
+                                                  'No recent scores yet',
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.white54,
+                                                  ),
+                                                )
+                                              else
+                                                ...List.generate(
+                                                  recent.length,
+                                                  (index) {
+                                                    final data =
+                                                        recent[index].data()
+                                                            as Map<
+                                                              String,
+                                                              dynamic
+                                                            >;
+                                                    final percent =
+                                                        (data['percentage'] ??
+                                                                data['score'] ??
+                                                                0)
+                                                            as num;
+                                                    final title =
+                                                        (data['title'] ??
+                                                                'Quiz')
+                                                            .toString();
+                                                    final isImproving =
+                                                        index == 0;
+
+                                                    return Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            bottom: 8,
+                                                          ),
+                                                      child:
+                                                          _AnimatedRecentScore(
+                                                            index: index,
+                                                            percent: percent
+                                                                .toDouble(),
+                                                            isImproving:
+                                                                isImproving,
+                                                            title: title,
+                                                          ),
+                                                    );
+                                                  },
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Footer CTA
+                                        Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 16,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                gradient: const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFFFFD54F),
+                                                    Color(0xFFFFB74D),
+                                                  ],
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.amber
+                                                        .withOpacity(0.3),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          'Detailed Stats',
+                                                          style:
+                                                              GoogleFonts.inter(
+                                                                color: Colors
+                                                                    .black87,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                fontSize: 15,
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        Text(
+                                                          'Analytics',
+                                                          style:
+                                                              GoogleFonts.inter(
+                                                                color: Colors
+                                                                    .black54,
+                                                                fontSize: 12,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  _AnimatedActionButton(
+                                                    onPressed: () {
+                                                      AppRouter.router.go(
+                                                        AppRouter.detailStats,
+                                                      );
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                            .animate()
+                                            .fadeIn(
+                                              duration: 600.ms,
+                                              delay: 400.ms,
+                                            )
+                                            .slideY(begin: 0.2, end: 0),
+                                        // Extra bottom padding
+                                        const SizedBox(height: 20),
+                                      ],
+                                    );
+                                  },
                                 ),
-                              ).animate().scale(
-                                duration: 300.ms,
-                                curve: Curves.easeOutBack,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                    child: Text(
-                                      'Statistics',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontSize: 20, // Reduced font size
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  )
-                                  .animate()
-                                  .fadeIn(duration: 500.ms, delay: 100.ms)
-                                  .slideX(begin: -0.2, end: 0),
                             ],
                           ),
-
-                          const SizedBox(height: 16),
-
-                          if (user == null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 24),
-                              child: Center(
-                                child: Text(
-                                  'Sign in to see your statistics',
-                                  style: GoogleFonts.inter(color: Colors.white70),
-                                ),
-                              ),
-                            )
-                          else
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user.uid)
-                                  .collection('activities')
-                                  .orderBy('timestamp', descending: true)
-                                  .limit(50)
-                                  .snapshots(),
-                              builder: (context, activitySnap) {
-                                if (activitySnap.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.only(top: 18),
-                                      child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.amber,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-
-                                final activityDocs = activitySnap.data?.docs ?? [];
-                                final totalQuizzes = activityDocs.length;
-                                final scores = activityDocs
-                                    .map(
-                                      (d) => ((d.data() as Map<String, dynamic>)['score'] ??
-                                              0)
-                                          as int,
-                                    )
-                                    .toList();
-                                final bestScore =
-                                    scores.isEmpty ? 0 : scores.reduce((a, b) => a > b ? a : b);
-                                final avgScore = scores.isEmpty
-                                    ? 0
-                                    : (scores.reduce((a, b) => a + b) / scores.length);
-
-                                final recent = activityDocs.take(5).toList();
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    // Summary cards
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _AnimatedStatCard(
-                                            title: 'Total Quizzes',
-                                            value: '$totalQuizzes',
-                                            icon: Icons.quiz_outlined,
-                                            gradient: const LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color(0xFFFFD54F),
-                                                Color(0xFFFFA000),
-                                              ],
-                                            ),
-                                            accentColor: Colors.amber,
-                                            trend: totalQuizzes > 0 ? 'Live' : '0',
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: _AnimatedStatCard(
-                                            title: 'Best Score',
-                                            value: '$bestScore%',
-                                            icon: Icons.emoji_events_outlined,
-                                            gradient: const LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color(0xFF1DE9B6),
-                                                Color(0xFF00BFA5),
-                                              ],
-                                            ),
-                                            accentColor: Colors.tealAccent,
-                                            trend: 'Best',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                          const SizedBox(height: 16),
-
-                          // Circular progress with accuracy
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        Icons.trending_up_rounded,
-                                        color: Colors.amber.shade200,
-                                        size: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Performance',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Center(
-                                  child: _AnimatedCircularProgress(
-                                    value: (avgScore / 100).clamp(0.0, 1.0),
-                                    label: 'Avg Accuracy',
-                                    gradient: const LinearGradient(
-                                      colors: [Colors.amber, Colors.orange],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Recent Scores Section
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Recent Scores',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Last 5',
-                                        style: GoogleFonts.inter(
-                                          color: Colors.greenAccent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                if (recent.isEmpty)
-                                  Text(
-                                    'No recent scores yet',
-                                    style: GoogleFonts.inter(color: Colors.white54),
-                                  )
-                                else
-                                  ...List.generate(recent.length, (index) {
-                                    final data =
-                                        recent[index].data() as Map<String, dynamic>;
-                                    final percent = (data['score'] ?? 0) as int;
-                                    final title = (data['title'] ?? 'Quiz').toString();
-                                    final isImproving = index == 0;
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: _AnimatedRecentScore(
-                                        index: index,
-                                        percent: percent,
-                                        isImproving: isImproving,
-                                        title: title,
-                                      ),
-                                    );
-                                  }),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Footer CTA
-                          Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFFFD54F),
-                                      Color(0xFFFFB74D),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.amber.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Detailed Stats',
-                                            style: GoogleFonts.inter(
-                                              color: Colors.black87,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 15,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          Text(
-                                            'Analytics',
-                                            style: GoogleFonts.inter(
-                                              color: Colors.black54,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    _AnimatedActionButton(
-                                      onPressed: () {
-                                        AppRouter.router.go(AppRouter.detailStats);
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              )
-                              .animate()
-                              .fadeIn(duration: 600.ms, delay: 400.ms)
-                              .slideY(begin: 0.2, end: 0),
-
-                          // Extra bottom padding
-                          const SizedBox(height: 20),
-                                  ],
-                                );
-                              },
-                            ),
-                        ],
-                    ),
-                  ),
-                ),
-              );
-            },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -447,7 +591,6 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard>
             ),
             child: Row(
               children: [
-                // Icon container
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -640,7 +783,6 @@ class _GradientCircularProgressPainter extends CustomPainter {
     final radius = size.width / 2;
     final strokeWidth = 10.0;
 
-    // Background circle
     final bgPaint = Paint()
       ..color = Colors.white.withOpacity(0.1)
       ..style = PaintingStyle.stroke
@@ -648,7 +790,6 @@ class _GradientCircularProgressPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius - strokeWidth / 2, bgPaint);
 
-    // Progress circle with gradient
     final rect = Rect.fromCircle(center: center, radius: radius);
     final shader = gradient.createShader(rect);
 
@@ -668,12 +809,15 @@ class _GradientCircularProgressPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return oldDelegate is _GradientCircularProgressPainter &&
+        (oldDelegate.progress != progress || oldDelegate.gradient != gradient);
+  }
 }
 
 class _AnimatedRecentScore extends StatefulWidget {
   final int index;
-  final int percent;
+  final double percent;
   final bool isImproving;
   final String title;
 
@@ -692,6 +836,13 @@ class _AnimatedRecentScoreState extends State<_AnimatedRecentScore>
     with SingleTickerProviderStateMixin {
   bool _isHighlighted = false;
 
+  Color _getScoreColor() {
+    if (widget.percent >= 90) return Colors.greenAccent;
+    if (widget.percent >= 70) return Colors.amber;
+    if (widget.percent >= 50) return Colors.orange;
+    return Colors.redAccent;
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -708,7 +859,6 @@ class _AnimatedRecentScoreState extends State<_AnimatedRecentScore>
             ),
             child: Row(
               children: [
-                // Quiz number
                 Container(
                   width: 22,
                   height: 22,
@@ -800,7 +950,7 @@ class _AnimatedRecentScoreState extends State<_AnimatedRecentScore>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '${widget.percent}%',
+                        '${widget.percent.round()}%',
                         style: GoogleFonts.inter(
                           color: _getScoreColor(),
                           fontSize: 10,
@@ -826,13 +976,6 @@ class _AnimatedRecentScoreState extends State<_AnimatedRecentScore>
         .fadeIn(duration: 500.ms, delay: (600 + widget.index * 100).ms)
         .slideX(begin: 0.2, end: 0);
   }
-
-  Color _getScoreColor() {
-    if (widget.percent >= 90) return Colors.greenAccent;
-    if (widget.percent >= 70) return Colors.amber;
-    if (widget.percent >= 50) return Colors.orange;
-    return Colors.redAccent;
-  }
 }
 
 class _AnimatedActionButton extends StatefulWidget {
@@ -850,25 +993,27 @@ class _AnimatedActionButtonState extends State<_AnimatedActionButton>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 100),
-      transform: _isPressed
-          ? (Matrix4.identity()..scale(0.95))
-          : Matrix4.identity(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.green.shade800,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: widget.onPressed,
-            onTapDown: (_) => setState(() => _isPressed = true),
-            onTapUp: (_) => setState(() => _isPressed = false),
-            onTapCancel: () => setState(() => _isPressed = false),
-            child: Text(
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        transform: _isPressed
+            ? (Matrix4.identity()..scale(0.95))
+            : Matrix4.identity(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.green.shade800,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
               'Open',
               style: GoogleFonts.inter(
                 color: Colors.white,
@@ -876,10 +1021,10 @@ class _AnimatedActionButtonState extends State<_AnimatedActionButton>
                 fontSize: 13,
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.arrow_forward, color: Colors.white, size: 14),
-        ],
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_forward, color: Colors.white, size: 14),
+          ],
+        ),
       ),
     );
   }

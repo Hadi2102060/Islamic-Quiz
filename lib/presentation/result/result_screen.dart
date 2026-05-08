@@ -1,12 +1,15 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:quiz_app/data/providers/leaderboard_provider.dart';
+import 'package:quiz_app/data/providers/session_user_provider.dart';
 import 'package:quiz_app/services/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/widgets/glass_card.dart';
 import '../../domain/entities/quiz_category.dart';
@@ -39,8 +42,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   void initState() {
     super.initState();
     _formatTime();
-    // authStateProvider might not be ready in initState.
-    // Try now, then retry right after first frame.
     _saveScoreToLeaderboard();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _saveScoreToLeaderboard();
@@ -48,8 +49,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   }
 
   void _formatTime() {
-    // You can get actual time from quiz state if available
-    // For now using placeholder
     final minutes = 2;
     final seconds = 15;
     _timeString = '${minutes}m ${seconds}s';
@@ -58,33 +57,39 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   Future<void> _saveScoreToLeaderboard() async {
     if (_scoreSaved || _saveInProgress || widget.category == null) return;
 
-    // Prefer direct FirebaseAuth access (reliable in initState),
-    // fallback to Riverpod authStateProvider if needed.
-    final currentUser =
-        FirebaseAuth.instance.currentUser ?? ref.read(authStateProvider).value;
-    if (currentUser == null) {
-      // auth not ready yet; we'll retry on next frame / rebuild.
-      return;
-    }
+    final userId = await ref.read(sessionUserIdProvider.future);
+    if (userId == null) return;
+
+    final firestore = ref.read(firebaseFirestoreProvider);
+    final userDoc = await firestore.collection('users').doc(userId).get();
+    final userData = userDoc.data();
+    final userNameRaw = (userData?['name'] as String?)?.trim();
+    final userName = (userNameRaw != null && userNameRaw.isNotEmpty)
+        ? userNameRaw
+        : 'User';
+    // Get profile image - can be base64 or URL
+    final profileImageBase64 = userData?['profileImageBase64']?.toString();
+    final photoUrl =
+        userData?['photoUrl']?.toString() ??
+        userData?['profileImageUrl']?.toString();
 
     try {
       _saveInProgress = true;
       await ref
           .read(leaderboardRepositoryProvider)
           .updateUserScore(
-            userId: currentUser.uid,
-            userName: currentUser.displayName ?? 'User',
-            photoUrl: currentUser.photoURL,
+            userId: userId,
+            userName: userName,
+            photoUrl: photoUrl,
+            // Pass base64 image
             categoryId: widget.category!.id,
             score: widget.score,
           );
 
-      // Save achievement if score is high
-      final firestore = ref.read(firebaseFirestoreProvider);
       if (widget.score == widget.total && widget.total > 0) {
         await firestore
             .collection('users')
-            .doc(currentUser.uid)
+            .doc(userId)
             .collection('achievements')
             .add({
               'name': 'Perfect Score',
@@ -96,7 +101,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       } else if (widget.score >= (widget.total * 0.8)) {
         await firestore
             .collection('users')
-            .doc(currentUser.uid)
+            .doc(userId)
             .collection('achievements')
             .add({
               'name': 'Top 80%',
@@ -107,10 +112,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             });
       }
 
-      // Save recent activity
       await firestore
           .collection('users')
-          .doc(currentUser.uid)
+          .doc(userId)
           .collection('activities')
           .add({
             'title': widget.category!.title,
@@ -118,39 +122,29 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             'timestamp': FieldValue.serverTimestamp(),
           });
 
-      // Save the detailed result into the top-level "results" collection
-      // user+category wise (so the same user can have results for many categories).
-      //
-      // Doc id format: {uid}_{categoryId}
-      // This also matches the LeaderboardScreen which reads from collection('results').
-      final resultDocId = '${currentUser.uid}_${widget.category!.id}';
-      await firestore.collection('results').doc(resultDocId).set(
-        {
-          'userId': currentUser.uid,
-          'userName': currentUser.displayName ?? 'User',
-          'photoUrl': currentUser.photoURL,
-          // For LeaderboardScreen queries (it filters by 'category' string)
-          'category': widget.category!.title,
-          // Keep ids/titles too (useful for app-side queries)
-          'categoryId': widget.category!.id,
-          'categoryTitle': widget.category!.title,
-          'score': widget.score,
-          'correctAnswers': widget.score,
-          'totalQuestions': widget.total,
-          'percentage': widget.total > 0
-              ? ((widget.score * 100) / widget.total).round()
-              : 0,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      final resultDocId = '${userId}_${widget.category!.id}';
+      await firestore.collection('results').doc(resultDocId).set({
+        'userId': userId,
+        'userName': userName,
+        'photoUrl': photoUrl,
+        'profileImageBase64': profileImageBase64,
+        'category': widget.category!.title,
+        'categoryId': widget.category!.id,
+        'categoryTitle': widget.category!.title,
+        'score': widget.score,
+        'correctAnswers': widget.score,
+        'totalQuestions': widget.total,
+        'percentage': widget.total > 0
+            ? ((widget.score * 100) / widget.total).round()
+            : 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       setState(() {
         _scoreSaved = true;
         _saveInProgress = false;
       });
 
-      // Refresh leaderboard data
       ref.invalidate(leaderboardProvider(widget.category!.id));
       ref.invalidate(userRankProvider(widget.category!.id));
 
@@ -173,7 +167,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('স্কোর সংরক্ষণে সমস্যা হয়েছে'),
+            content: Text('Firebase Error: $e'),
             backgroundColor: Colors.red.shade800,
             behavior: SnackBarBehavior.floating,
           ),
@@ -187,14 +181,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     final percentage = widget.total > 0
         ? (widget.score * 100 / widget.total).round()
         : 0;
-    final currentUser = ref.watch(authStateProvider).value;
+    final sessionUserId = ref
+        .watch(sessionUserIdProvider)
+        .maybeWhen(data: (id) => id, orElse: () => null);
 
-    // Get leaderboard data if category exists
     final leaderboardAsync = widget.category != null
         ? ref.watch(leaderboardProvider(widget.category!.id))
         : const AsyncValue.data(<LeaderboardEntry>[]);
 
-    // Get user rank if category exists
     final userRankAsync = widget.category != null
         ? ref.watch(userRankProvider(widget.category!.id))
         : const AsyncValue.data(null);
@@ -203,7 +197,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // deep gradient
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -213,8 +206,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               ),
             ),
           ),
-
-          // Lottie decoration
           Positioned(
             right: -20,
             top: -20,
@@ -229,14 +220,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Top bar with category name
                   Row(
                     children: [
                       Material(
@@ -268,20 +257,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                         ),
                     ],
                   ),
-
                   const SizedBox(height: 22),
-
-                  // Animated circular percent
                   Center(
                     child: _AnimatedPercentage(
                       percentage: percentage,
                       label: _getMotivationalMessage(percentage),
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
-                  // Stats cards
                   Row(
                     children: [
                       Expanded(
@@ -295,7 +278,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _StatCard(
-                          title: 'সময়',
+                          title: 'সময়',
                           value: _timeString ?? '2m 15s',
                           icon: Icons.access_time,
                           color: const Color(0xFFFFD54F),
@@ -303,20 +286,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 14),
-
-                  // Leaderboard Preview Section
                   if (widget.category != null)
                     leaderboardAsync.when(
                       data: (entries) {
                         if (entries.isEmpty) {
                           return _buildEmptyLeaderboard();
                         }
-                        return _buildLeaderboardPreview(
-                          entries,
-                          currentUser?.uid,
-                        );
+                        return _buildLeaderboardPreview(entries, sessionUserId);
                       },
                       loading: () => _buildLoadingLeaderboard(),
                       error: (error, _) =>
@@ -324,10 +301,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                     )
                   else
                     _buildNoCategoryLeaderboard(),
-
                   const Spacer(),
-
-                  // User Rank Display
                   if (widget.category != null)
                     userRankAsync.when(
                       data: (rank) {
@@ -349,11 +323,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                                       size: 20,
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'আপনার অবস্থান: #$rank',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
+                                    Flexible(
+                                      child: Text(
+                                        'আপনার অবস্থান: #$rank',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     if (rank <= 3)
@@ -396,8 +373,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       loading: () => const SizedBox.shrink(),
                       error: (_, __) => const SizedBox.shrink(),
                     ),
-
-                  // Footer actions
                   Row(
                     children: [
                       Expanded(child: _buildPlayAgainButton()),
@@ -496,15 +471,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Top 3 avatars
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(3, (index) {
               if (index < topEntries.length) {
                 final entry = topEntries[index];
                 final isCurrentUser = entry.userId == currentUserId;
-
                 return _buildTopPlayer(
                   rank: index + 1,
                   entry: entry,
@@ -515,15 +487,12 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               }
             }),
           ),
-
           if (entries.length > 3) ...[
             const SizedBox(height: 12),
-            // Show next 2 players
             ...List.generate(entries.skip(3).take(2).length, (index) {
               final entry = entries.skip(3).toList()[index];
               final globalIndex = index + 4;
               final isCurrentUser = entry.userId == currentUserId;
-
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -546,24 +515,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.white12,
-                      backgroundImage: entry.photoUrl != null
-                          ? NetworkImage(entry.photoUrl!)
-                          : null,
-                      child: entry.photoUrl == null
-                          ? Text(
-                              entry.userName.isNotEmpty
-                                  ? entry.userName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                              ),
-                            )
-                          : null,
-                    ),
+                    _buildUserAvatar(entry, radius: 14),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -603,7 +555,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   }) {
     final rankColors = [Colors.amber, Colors.grey, Colors.brown];
     final rankSize = rank == 1 ? 60.0 : 50.0;
-    final avatarRadius = rank == 1 ? 24.0 : 20.0;
 
     return Column(
       children: [
@@ -621,24 +572,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 ),
               ),
               child: Center(
-                child: CircleAvatar(
-                  radius: avatarRadius,
-                  backgroundColor: rankColors[rank - 1].withOpacity(0.3),
-                  backgroundImage: entry.photoUrl != null
-                      ? NetworkImage(entry.photoUrl!)
-                      : null,
-                  child: entry.photoUrl == null
-                      ? Text(
-                          entry.userName.isNotEmpty
-                              ? entry.userName[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null,
-                ),
+                child: _buildUserAvatar(entry, radius: rank == 1 ? 24 : 20),
               ),
             ),
             if (rank == 1)
@@ -680,6 +614,52 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildUserAvatar(LeaderboardEntry entry, {required double radius}) {
+    // First priority: Use profileImageBase64 if available
+    if (entry.profileImageBase64 != null &&
+        entry.profileImageBase64!.isNotEmpty) {
+      try {
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.white12,
+          backgroundImage: MemoryImage(base64Decode(entry.profileImageBase64!)),
+          onBackgroundImageError: (_, __) =>
+              _buildFallbackAvatar(entry, radius),
+        );
+      } catch (e) {
+        return _buildFallbackAvatar(entry, radius);
+      }
+    }
+
+    // Second priority: Use photoUrl (network image)
+    if (entry.photoUrl != null && entry.photoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.white12,
+        backgroundImage: NetworkImage(entry.photoUrl!),
+        onBackgroundImageError: (_, __) => _buildFallbackAvatar(entry, radius),
+      );
+    }
+
+    // Fallback: Show initials
+    return _buildFallbackAvatar(entry, radius);
+  }
+
+  Widget _buildFallbackAvatar(LeaderboardEntry entry, double radius) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade800,
+      child: Text(
+        entry.userName.isNotEmpty ? entry.userName[0].toUpperCase() : '?',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: radius * 0.7,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
@@ -819,7 +799,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           borderRadius: BorderRadius.circular(12),
           onTap: () {
             if (widget.category != null) {
-              // Navigate to quiz with restart flag
               AppRouter.router.go(
                 '${AppRouter.quiz}/${widget.category!.id}',
                 extra: {'category': widget.category, 'restart': true},
@@ -1054,16 +1033,10 @@ class _ShareButton extends StatelessWidget {
             await Clipboard.setData(ClipboardData(text: shareText));
 
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('স্কোর কপি হয়েছে! এখন শেয়ার করুন'),
-                  backgroundColor: Colors.green.shade800,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  duration: const Duration(seconds: 2),
-                ),
+              Share.share(
+                'Peace be upon you, I just played "The Quran Quiz". '
+                'Check it out and join me: https://example.com/app_link',
+                subject: 'Join me in The Quran Quiz!',
               );
             }
           },

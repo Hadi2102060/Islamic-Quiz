@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"islamicquiz-83516","appId":"1:477459495948:android:ed62bd44baf1938dd20229","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"islamicquiz-83516","configurations":{"android":"1:477459495948:android:ed62bd44baf1938dd20229","ios":"1:477459495948:ios:0574d7e3ed079e1bd20229","macos":"1:477459495948:ios:0574d7e3ed079e1bd20229","web":"1:477459495948:web:77f497d40c1d79dbd20229","windows":"1:477459495948:web:754fb876424c6a66d20229"}}}}}}
+{
+    "firestore": {
+        "rules": "firestore.rules"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "islamicquiz-83516",
+                    "appId": "1:477459495948:android:ed62bd44baf1938dd20229",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            }
+        },
+        "dart": {
+            "lib/firebase_options.dart": {
+                "projectId": "islamicquiz-83516",
+                "configurations": {
+                    "android": "1:477459495948:android:ed62bd44baf1938dd20229",
+                    "ios": "1:477459495948:ios:0574d7e3ed079e1bd20229",
+                    "macos": "1:477459495948:ios:0574d7e3ed079e1bd20229",
+                    "web": "1:477459495948:web:77f497d40c1d79dbd20229",
+                    "windows": "1:477459495948:web:754fb876424c6a66d20229"
+                }
+            }
+        }
+    }
+}

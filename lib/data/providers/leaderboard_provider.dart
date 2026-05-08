@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quiz_app/domain/entities/leaderboard_entry.dart';
 import 'package:quiz_app/services/firebase_service.dart';
+import 'package:quiz_app/data/providers/session_user_provider.dart';
 
 final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((ref) {
   return LeaderboardRepository(ref.read(firebaseFirestoreProvider));
@@ -20,11 +21,11 @@ final userRankProvider = FutureProvider.family<int?, String>((
   ref,
   categoryId,
 ) async {
-  final currentUser = ref.read(authStateProvider).value;
-  if (currentUser == null) return null;
+  final currentUserId = await ref.watch(sessionUserIdProvider.future);
+  if (currentUserId == null) return null;
 
   final repository = ref.read(leaderboardRepositoryProvider);
-  return await repository.getUserRank(categoryId, currentUser.uid);
+  return await repository.getUserRank(categoryId, currentUserId);
 });
 
 class LeaderboardRepository {
@@ -78,6 +79,7 @@ class LeaderboardRepository {
     String? photoUrl,
     required String categoryId,
     required int score,
+    String? profileImageBase64,
   }) async {
     try {
       final userRef = _firestore.collection('leaderboard').doc(userId);

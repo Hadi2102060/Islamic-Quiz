@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:quiz_app/presentation/widgets/stats_background.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -29,6 +29,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   String? currentUserId;
   Map<String, dynamic>? currentUserData;
+  final Map<String, String> userPhotosCache = {};
 
   @override
   void initState() {
@@ -38,13 +39,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   Future<void> _getCurrentUser() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        currentUserId = user.uid;
-      });
-      await _fetchCurrentUserData();
-    }
+    final prefs = await SharedPreferences.getInstance();
+    final savedUserId = prefs.getString('userId')?.trim();
+    final phone = prefs.getString('userPhone')?.trim() ?? '';
+    final derivedUserId = phone.replaceAll(RegExp(r'[^0-9]'), '');
+
+    final userId = (savedUserId != null && savedUserId.isNotEmpty)
+        ? savedUserId
+        : (derivedUserId.isNotEmpty ? derivedUserId : null);
+
+    if (userId == null) return;
+    setState(() {
+      currentUserId = userId;
+    });
+    await _fetchCurrentUserData();
   }
 
   Future<void> _fetchCurrentUserData() async {
@@ -72,49 +80,94 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       backgroundColor: Colors.transparent,
       body: StatsBackground(
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              children: [
-                // Top row with back button and category selector
-                Row(
+          child: Column(
+            children: [
+              // ===== FIXED TOP SECTION (Never scrolls) =====
+              Container(
+                color: Colors.transparent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Material(
-                      color: Colors.white12,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).maybePop(),
-                        borderRadius: BorderRadius.circular(12),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Icon(Icons.arrow_back, color: Colors.white),
+                    // Back button & Category dropdown row
+                    Row(
+                      children: [
+                        Material(
+                          color: Colors.white12,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).maybePop(),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildCategoryDropdown()),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildCategoryDropdown()),
+                    const SizedBox(height: 20),
+
+                    // "CHAMPIONS" Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD54F), Color(0xFFFFB300)],
+                        ),
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.emoji_events_rounded,
+                            color: Colors.black,
+                            size: 24,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            "CHAMPIONS",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              letterSpacing: 2,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(duration: 500.ms).scale(),
+
+                    const SizedBox(height: 20),
+
+                    // Top 3 Stat Cards (Horizontal)
+                    _buildTopPlayersCards(),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 24), // Added spacing after category
-                // Header banner
-                Center(child: _buildHeader()),
-
-                const SizedBox(height: 28), // Increased spacing after header
-                /// PODIUM - Top 3 from selected category
-                _buildPodiumSection(),
-
-                const SizedBox(height: 28), // Increased spacing after podium
-                /// LIST - Leaderboard for selected category
-                Expanded(child: _buildLeaderboardList()),
-
-                const SizedBox(height: 20), // Added spacing before invite
-                /// INVITE and User Stats
-                _buildInviteSection(context),
-              ],
-            ),
+              // ===== SCROLLABLE LEADERBOARD LIST (Takes remaining space) =====
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildLeaderboardList(currentUserId),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -135,7 +188,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           isExpanded: true,
           dropdownColor: const Color(0xFF0B6B3A),
           icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-          style: const TextStyle(color: Colors.white, fontSize: 16),
+          style: const TextStyle(color: Colors.white, fontSize: 14),
           items: categories.map((String category) {
             return DropdownMenuItem<String>(
               value: category,
@@ -157,122 +210,322 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 
-  /// HEADER
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD54F), Color(0xFFFFB300)],
-        ),
-        borderRadius: BorderRadius.circular(40),
+  Widget _buildTopPlayersCards() {
+    return SizedBox(
+      height: 160,
+      child: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('results')
+            .orderBy('score', descending: true)
+            .limit(100)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            );
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final topUsers = docs
+              .where(
+                (doc) => _matchesSelectedCategory(
+                  doc.data() as Map<String, dynamic>,
+                ),
+              )
+              .take(3)
+              .toList();
+
+          // Prepare top 3 players with full data
+          List<Map<String, dynamic>> topPlayers = [];
+          for (int i = 0; i < topUsers.length; i++) {
+            final userData = topUsers[i].data() as Map<String, dynamic>;
+            topPlayers.add({
+              'name': userData['userName'] ?? 'Anonymous',
+              'score': userData['score'] ?? 0,
+              'rank': i + 1,
+              'initials': _getInitials(userData['userName'] ?? 'User'),
+              'photo':
+                  userData['profileImageBase64'] ??
+                  userData['photoUrl'] ??
+                  userData['photo'] ??
+                  '',
+              'userId': userData['userId'] ?? topUsers[i].id,
+            });
+          }
+
+          // Fill empty slots
+          while (topPlayers.length < 3) {
+            topPlayers.add({
+              'name': 'Empty',
+              'score': 0,
+              'rank': topPlayers.length + 1,
+              'initials': '--',
+              'photo': '',
+              'userId': '',
+            });
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 2nd Place - Medium
+              FutureBuilder<DocumentSnapshot?>(
+                future: topPlayers[1]['userId'].toString().isNotEmpty
+                    ? FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(topPlayers[1]['userId'])
+                          .get()
+                    : Future.value(null),
+                builder: (context, userSnapshot) {
+                  Map<String, dynamic> playerWithPhoto = topPlayers[1];
+
+                  if (userSnapshot.hasData &&
+                      userSnapshot.data != null &&
+                      userSnapshot.data!.exists) {
+                    final userDoc =
+                        userSnapshot.data!.data() as Map<String, dynamic>;
+                    playerWithPhoto = {
+                      ...topPlayers[1],
+                      'photo':
+                          userDoc['profileImageBase64'] ??
+                          userDoc['photoUrl'] ??
+                          userDoc['photo'] ??
+                          '',
+                    };
+                  }
+
+                  return Flexible(child: _buildPlayerCard(playerWithPhoto, 2));
+                },
+              ),
+              const SizedBox(width: 8),
+              // 1st Place - Largest
+              FutureBuilder<DocumentSnapshot?>(
+                future: topPlayers[0]['userId'].toString().isNotEmpty
+                    ? FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(topPlayers[0]['userId'])
+                          .get()
+                    : Future.value(null),
+                builder: (context, userSnapshot) {
+                  Map<String, dynamic> playerWithPhoto = topPlayers[0];
+
+                  if (userSnapshot.hasData &&
+                      userSnapshot.data != null &&
+                      userSnapshot.data!.exists) {
+                    final userDoc =
+                        userSnapshot.data!.data() as Map<String, dynamic>;
+                    playerWithPhoto = {
+                      ...topPlayers[0],
+                      'photo':
+                          userDoc['profileImageBase64'] ??
+                          userDoc['photoUrl'] ??
+                          userDoc['photo'] ??
+                          '',
+                    };
+                  }
+
+                  return Flexible(child: _buildPlayerCard(playerWithPhoto, 1));
+                },
+              ),
+              const SizedBox(width: 8),
+              // 3rd Place - Smallest
+              FutureBuilder<DocumentSnapshot?>(
+                future: topPlayers[2]['userId'].toString().isNotEmpty
+                    ? FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(topPlayers[2]['userId'])
+                          .get()
+                    : Future.value(null),
+                builder: (context, userSnapshot) {
+                  Map<String, dynamic> playerWithPhoto = topPlayers[2];
+
+                  if (userSnapshot.hasData &&
+                      userSnapshot.data != null &&
+                      userSnapshot.data!.exists) {
+                    final userDoc =
+                        userSnapshot.data!.data() as Map<String, dynamic>;
+                    playerWithPhoto = {
+                      ...topPlayers[2],
+                      'photo':
+                          userDoc['profileImageBase64'] ??
+                          userDoc['photoUrl'] ??
+                          userDoc['photo'] ??
+                          '',
+                    };
+                  }
+
+                  return Flexible(child: _buildPlayerCard(playerWithPhoto, 3));
+                },
+              ),
+            ],
+          );
+        },
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.emoji_events_rounded, color: Colors.black),
-          SizedBox(width: 8),
-          Text(
-            "CHAMPIONS",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              letterSpacing: 2,
-              color: Colors.black,
-            ),
+    );
+  }
+
+  Widget _buildPlayerCard(Map<String, dynamic> player, int rank) {
+    final colors = [
+      [Colors.amber.shade300, Colors.amber.shade700],
+      [Colors.cyan.shade200, Colors.cyan.shade600],
+      [const Color(0xFFCD7F32), const Color(0xFFB87333)],
+    ];
+
+    final bgColors = [
+      Colors.amber,
+      Colors.cyan.shade400,
+      const Color(0xFFCD7F32),
+    ];
+
+    // Hierarchical sizing: 1st > 2nd > 3rd
+    final cardHeights = [140.0, 110.0, 85.0];
+    final avatarRadii = [36.0, 28.0, 22.0];
+    final nameFontSizes = [14.0, 12.0, 10.0];
+    final scoreFontSizes = [13.0, 11.0, 9.0];
+
+    final cardHeight = cardHeights[rank - 1];
+    final avatarRadius = avatarRadii[rank - 1];
+    final nameFontSize = nameFontSizes[rank - 1];
+    final scoreFontSize = scoreFontSizes[rank - 1];
+
+    return Container(
+      height: cardHeight,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors[rank - 1],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).scale();
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Avatar with photo
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              CircleAvatar(
+                radius: avatarRadius,
+                backgroundColor: bgColors[rank - 1],
+                backgroundImage: _getPlayerPhotoProvider(player),
+                child: _getPlayerPhotoProvider(player) == null
+                    ? Text(
+                        player['initials'] ?? 'U',
+                        style: TextStyle(
+                          color: rank == 3 ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: avatarRadius * 0.5,
+                        ),
+                      )
+                    : null,
+              ),
+              // Rank badge
+              Positioned(
+                bottom: -4,
+                right: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.red.shade600,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Text(
+                    '#${player['rank']}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Name
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              player['name'].toString().split(" ").first,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: nameFontSize,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+            ),
+          ),
+          const SizedBox(height: 3),
+          // Score
+          Text(
+            "${player['score']} pts",
+            style: TextStyle(color: Colors.white70, fontSize: scoreFontSize),
+          ),
+        ],
+      ),
+    ).animate().slideY(begin: 0.2).fade();
   }
 
-  /// PODIUM - Top 3 from selected category
-  Widget _buildPodiumSection() {
-    if (selectedCategory == null) return const SizedBox();
+  ImageProvider? _getPlayerPhotoProvider(Map<String, dynamic> player) {
+    final photo =
+        player['photo'] ??
+        player['photoUrl'] ??
+        player['profileImageBase64'] ??
+        '';
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('results')
-          .where('category', isEqualTo: selectedCategory)
-          .orderBy('score', descending: true)
-          .limit(3)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Error loading data'));
-        }
+    if (photo.isEmpty) return null;
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          );
-        }
+    if (photo.startsWith('data:image')) {
+      try {
+        final base64String = photo.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        return null;
+      }
+    }
 
-        final topUsers = snapshot.data?.docs ?? [];
+    // Check if it's directly base64 (no data URI prefix)
+    try {
+      if (photo.length > 100 && !photo.startsWith('http')) {
+        return MemoryImage(base64Decode(photo));
+      }
+    } catch (e) {
+      // Not valid base64, continue
+    }
 
-        if (topUsers.isEmpty) {
-          return Container(
-            height: 100,
-            alignment: Alignment.center,
-            child: const Text(
-              'No scores yet in this category',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          );
-        }
+    if (photo.startsWith('http')) {
+      return NetworkImage(photo);
+    }
 
-        // Prepare users list with proper indexing
-        List<Map<String, dynamic>> podiumUsers = [];
+    return null;
+  }
 
-        for (int i = 0; i < topUsers.length; i++) {
-          final userData = topUsers[i].data() as Map<String, dynamic>;
-          podiumUsers.add({
-            'name': userData['userName'] ?? 'Anonymous',
-            'score': userData['score'] ?? 0,
-            'avatar': _getInitials(userData['userName'] ?? 'User'),
-            'country': userData['country'] ?? '🌍',
-            'badges': userData['badges'] ?? 0,
-          });
-        }
+  bool _matchesSelectedCategory(Map<String, dynamic> data) {
+    if (selectedCategory != null && selectedCategory!.startsWith('All Quiz')) {
+      return true;
+    }
 
-        // Ensure we have at least 3 items for podium layout
-        while (podiumUsers.length < 3) {
-          podiumUsers.add({
-            'name': 'Empty Slot',
-            'score': 0,
-            'avatar': '--',
-            'country': '🌍',
-            'badges': 0,
-          });
-        }
+    final cat = (data['category'] ?? '')?.toString();
+    final catTitle = (data['categoryTitle'] ?? '')?.toString();
+    final catId = (data['categoryId'] ?? '')?.toString();
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            double width = constraints.maxWidth * 0.28;
-
-            return SizedBox(
-              height: 200, // Increased height for better visibility
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // 2nd place
-                  _buildPodiumTile(width, 2, podiumUsers[1]),
-
-                  const SizedBox(width: 16), // Increased spacing
-                  // 1st place
-                  _buildPodiumTile(width, 1, podiumUsers[0], isWinner: true),
-
-                  const SizedBox(width: 16), // Increased spacing
-                  // 3rd place
-                  _buildPodiumTile(width, 3, podiumUsers[2]),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+    return cat == selectedCategory ||
+        catTitle == selectedCategory ||
+        catId == selectedCategory;
   }
 
   String _getInitials(String name) {
@@ -286,110 +539,58 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         : name[0].toUpperCase();
   }
 
-  Widget _buildPodiumTile(
-    double width,
-    int rank,
-    Map<String, dynamic> user, {
-    bool isWinner = false,
-  }) {
-    final heights = [140.0, 160.0, 120.0];
-    final height = heights[rank - 1];
-
-    // Don't show if empty slot
-    if (user['avatar'] == '--') {
-      return Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white12,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            const CircleAvatar(
-              radius: 22,
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.person, color: Colors.white38),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'No player',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ).animate().slideY(begin: 0.4).fade();
+  Future<String> _fetchUserPhoto(String userId) async {
+    // Check cache first
+    if (userPhotosCache.containsKey(userId)) {
+      return userPhotosCache[userId] ?? '';
     }
 
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isWinner
-              ? [Colors.amber.shade300, Colors.amber.shade700]
-              : [Colors.white24, Colors.white12],
-        ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          CircleAvatar(
-            radius: isWinner ? 28 : 22,
-            backgroundColor: isWinner ? Colors.amber : Colors.white12,
-            child: Text(
-              user['avatar'],
-              style: TextStyle(
-                color: isWinner ? Colors.black : Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: isWinner ? 16 : 14,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            user['name'].split(" ").first,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            "#$rank",
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
-          ),
-          Text(
-            "${user['score']} pts",
-            style: const TextStyle(color: Colors.white70, fontSize: 10),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ),
-    ).animate().slideY(begin: 0.4).fade();
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        // Try all photo sources in priority order
+        final photo =
+            userData['profileImageBase64'] ??
+            userData['photoUrl'] ??
+            userData['photo'] ??
+            '';
+        userPhotosCache[userId] = photo;
+        return photo;
+      }
+    } catch (e) {
+      // Silently handle permission errors and other exceptions
+      if (e.toString().contains('permission') ||
+          e.toString().contains('PERMISSION_DENIED')) {
+        print('Photo access denied for user: $userId');
+      } else {
+        print('Error fetching user photo: $e');
+      }
+    }
+
+    // Cache empty result to avoid repeated failed attempts
+    userPhotosCache[userId] = '';
+    return '';
   }
 
-  /// LIST - Full leaderboard for selected category
-  Widget _buildLeaderboardList() {
+  Widget _buildLeaderboardList(String? activeUserId) {
     if (selectedCategory == null) return const SizedBox();
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('results')
-          .where('category', isEqualTo: selectedCategory)
           .orderBy('score', descending: true)
+          .limit(500)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
             child: Text(
-              'Error loading leaderboard: ${snapshot.error}',
+              'Error: ${snapshot.error}',
               style: const TextStyle(color: Colors.white),
             ),
           );
@@ -401,7 +602,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           );
         }
 
-        final results = snapshot.data?.docs ?? [];
+        final resultsAll = snapshot.data?.docs ?? [];
+        final results = resultsAll
+            .where(
+              (doc) =>
+                  _matchesSelectedCategory(doc.data() as Map<String, dynamic>),
+            )
+            .toList();
 
         if (results.isEmpty) {
           return Center(
@@ -415,8 +622,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No scores yet in\n$selectedCategory',
-                  textAlign: TextAlign.center,
+                  'No scores yet',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 16,
@@ -428,221 +634,65 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         }
 
         return ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 12, bottom: 24),
           itemCount: results.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final userData = results[index].data() as Map<String, dynamic>;
-            // In our Firestore structure, doc.id is NOT the user's uid
-            // (it's usually "{uid}_{categoryId}"). Use the stored userId field.
             final userId = (userData['userId'] ?? results[index].id).toString();
+            final isCurrentUser = userId == activeUserId;
 
-            return _LeaderboardTile(
-              index: index,
-              userId: userId,
-              userData: userData,
-              isCurrentUser: userId == currentUserId,
+            return FutureBuilder<String>(
+              future: _fetchUserPhoto(userId),
+              builder: (context, photoSnapshot) {
+                final userDataWithPhoto = {
+                  ...userData,
+                  'photo': photoSnapshot.data ?? '',
+                };
+
+                return _LeaderboardTile(
+                  index: index,
+                  userData: userDataWithPhoto,
+                  isCurrentUser: isCurrentUser,
+                );
+              },
             );
           },
         );
       },
     );
   }
-
-  /// INVITE SECTION with User Stats
-  Widget _buildInviteSection(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD54F), Color(0xFFFFB300)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          // User Stats Row
-          if (currentUserId != null)
-            FutureBuilder<QuerySnapshot>(
-              future: FirebaseFirestore.instance
-                  .collection('results')
-                  .where('userId', isEqualTo: currentUserId)
-                  .where('category', isEqualTo: selectedCategory)
-                  .limit(1)
-                  .get(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox(
-                    height: 30,
-                    child: Center(
-                      child: CircularProgressIndicator(color: Colors.black),
-                    ),
-                  );
-                }
-
-                final hasResult = snapshot.data?.docs.isNotEmpty ?? false;
-                final userResult = hasResult
-                    ? snapshot.data!.docs.first.data() as Map<String, dynamic>
-                    : null;
-                final userScore = hasResult ? (userResult?['score'] ?? 0) : 0;
-
-                return FutureBuilder<int?>(
-                  future: hasResult ? _getUserRank(userScore as int) : null,
-                  builder: (context, rankSnap) {
-                    final rank = rankSnap.data;
-                    final rankText = hasResult
-                        ? (rank != null ? '#$rank' : '...')
-                        : 'N/A';
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black12,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.black,
-                            child: Text(
-                              currentUserData?['name'] != null
-                                  ? _getInitials(currentUserData!['name'])
-                                  : 'U',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  currentUserData?['name'] ?? 'User',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                if (hasResult)
-                                  Text(
-                                    'Rank: $rankText • $userScore pts',
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 12,
-                                    ),
-                                  )
-                                else
-                                  const Text(
-                                    'No score yet in this category',
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-
-          const SizedBox(
-            height: 8,
-          ), // Added spacing between user stats and invite
-          // Invite Row
-          Row(
-            children: [
-              const Icon(Icons.group_add, size: 28, color: Colors.black),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "INVITE FRIENDS",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    Text(
-                      "Compete together and earn badges",
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () {
-                  Share.share(
-                    'Peace be upon you, I just played "The Quran Quiz" in the $selectedCategory category. '
-                    'Check it out and join me: https://example.com/app_link',
-                    subject: 'Join me in The Quran Quiz!',
-                  );
-                },
-                child: const Text("Invite"),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<int?> _getUserRank(int userScore) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('results')
-          .where('category', isEqualTo: selectedCategory)
-          .where('score', isGreaterThan: userScore)
-          .get();
-
-      return snapshot.docs.length + 1;
-    } catch (e) {
-      return null;
-    }
-  }
 }
 
-/// TILE
 class _LeaderboardTile extends StatelessWidget {
   final int index;
-  final String userId;
   final Map<String, dynamic> userData;
   final bool isCurrentUser;
 
   const _LeaderboardTile({
     required this.index,
-    required this.userId,
     required this.userData,
     this.isCurrentUser = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final medalColors = [Colors.amber, Colors.grey, Colors.brown];
     final isTopThree = index < 3;
+    final name = userData['userName'] ?? 'Anonymous';
+    final score = userData['score'] ?? 0;
+    final badges = userData['badges'] ?? 0;
+    final maxScore = userData['maxScore'] ?? 20;
+    final initials = _getInitials(name);
+
+    final medalColors = [Colors.amber, Colors.grey, Colors.brown];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isCurrentUser
             ? Colors.amber.withOpacity(0.2)
-            : Colors.white.withOpacity(.08),
+            : Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
         border: isCurrentUser
             ? Border.all(color: Colors.amber, width: 2)
@@ -650,111 +700,113 @@ class _LeaderboardTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          /// RANK
+          // Rank Circle
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isTopThree
-                  ? medalColors[index].withOpacity(.2)
+                  ? medalColors[index].withOpacity(0.2)
                   : Colors.white12,
             ),
             child: Center(
-              child: isTopThree
-                  ? Icon(
-                      Icons.emoji_events,
-                      color: medalColors[index],
-                      size: 20,
-                    )
-                  : Text(
-                      "#${index + 1}",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          /// AVATAR
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.white12,
-            child: Text(
-              _getInitials(userData['userName'] ?? 'User'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              child: Text(
+                "${index + 1}",
+                style: TextStyle(
+                  color: isTopThree ? medalColors[index] : Colors.white70,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
-
           const SizedBox(width: 12),
 
-          /// INFO
+          // Avatar with Photo
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: isTopThree
+                ? medalColors[index].withOpacity(0.3)
+                : Colors.white12,
+            backgroundImage: _getTilePhotoProvider(userData),
+            child: _getTilePhotoProvider(userData) == null
+                ? Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+
+          // User Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  userData['userName'] ?? 'Anonymous',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isCurrentUser ? Colors.amber : Colors.white,
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4, // Added runSpacing for better wrapping
+                const SizedBox(height: 4),
+                Row(
                   children: [
-                    _badge(
-                      Icons.star,
-                      "${userData['score'] ?? 0} pts",
-                      Colors.amber,
-                    ),
-                    _badge(
-                      Icons.badge,
-                      "${userData['badges'] ?? 0} badges",
-                      Colors.blue,
-                    ),
-                    if (userData['correctAnswers'] != null)
-                      _badge(
-                        Icons.check_circle,
-                        "${userData['correctAnswers']}/${userData['totalQuestions']}",
-                        Colors.green,
+                    Icon(Icons.star, color: Colors.amber, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$score pts",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orange,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$badges",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
 
-          const SizedBox(width: 8), // Added spacing before trailing widget
-
-          if (isCurrentUser)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.amber,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'YOU',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+          // Score Progress
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Icon(Icons.circle, color: Colors.red.shade400, size: 8),
+                const SizedBox(height: 4),
+                Text(
+                  "$score/$maxScore",
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
-              ),
-            )
-          else
-            const Icon(Icons.trending_up, color: Colors.white38),
+              ],
+            ),
+          ),
         ],
       ),
-    ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.2);
+    );
   }
 
   String _getInitials(String name) {
@@ -768,28 +820,40 @@ class _LeaderboardTile extends StatelessWidget {
         : name[0].toUpperCase();
   }
 
-  Widget _badge(IconData icon, String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+  ImageProvider? _getTilePhotoProvider(Map<String, dynamic> userData) {
+    // Try multiple photo sources
+    final photo =
+        userData['photo'] ??
+        userData['photoUrl'] ??
+        userData['profileImageBase64'] ??
+        '';
+
+    if (photo.isEmpty) return null;
+
+    // Check if it's base64 data
+    if (photo.startsWith('data:image')) {
+      try {
+        final base64String = photo.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Check if it's directly base64 (no data URI prefix)
+    try {
+      if (photo.length > 100 && !photo.startsWith('http')) {
+        return MemoryImage(base64Decode(photo));
+      }
+    } catch (e) {
+      // Not valid base64, continue
+    }
+
+    // Check if it's a URL
+    if (photo.startsWith('http')) {
+      return NetworkImage(photo);
+    }
+
+    return null;
   }
 }

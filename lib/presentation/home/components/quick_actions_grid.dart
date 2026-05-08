@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:quiz_app/presentation/router/app_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class QuickActionsGrid extends StatelessWidget {
   const QuickActionsGrid({super.key});
 
-  // 🔹 Rate Us → Google Play Store link
-  Future<void> _requestReview() async {
-    final url = Uri.parse('https://play.google.com/store/apps/');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      debugPrint('Could not launch $url');
-    }
+  // 🔹 Help → dedicated help screen
+  void _openHelp(BuildContext context) {
+    context.push(AppRouter.help);
   }
 
   // 🔹 Contact → Facebook page link
@@ -29,7 +26,7 @@ class QuickActionsGrid extends StatelessWidget {
   Future<void> _share() async {
     try {
       await Share.share(
-        'Assalamu Alaikum! Check out this beautiful Quran Quiz app!\nLearn & test your knowledge of the Quran in a fun & rewarding way 📖✨',
+        'Assalamu Alaikum! Check out this beautiful Quran Quiz app!\nLearn & test your knowledge of the Quran in a fun & rewarding way 📖✨.  To join this app : https://www.flicksize.com/islamic_quiz/',
         subject: 'Quran Quiz App - Join & Learn',
       );
     } catch (_) {
@@ -37,40 +34,20 @@ class QuickActionsGrid extends StatelessWidget {
     }
   }
 
-  // 🔹 About → Dialog
+  // 🔹 About → dedicated screen
   void _openAbout(BuildContext context) {
-    Navigator.pop(context); // drawer close
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'About Quran Quiz',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0B6B3A),
-          ),
-        ),
-        content: const Text(
-          'Quran Quiz App v1.0\n\nA fun & educational way to test your knowledge of the Holy Quran.\nMade with ❤️ for the Ummah.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: Color(0xFF0B6B3A)),
-            ),
-          ),
-        ],
-      ),
-    );
+    context.push(AppRouter.about);
   }
 
   @override
   Widget build(BuildContext context) {
     final actions = [
-      (Icons.star_rounded, 'Rate Us', Colors.amber, _requestReview),
+      (
+        Icons.help_outline_rounded,
+        'Help',
+        Colors.indigo.shade600,
+        () => _openHelp(context),
+      ),
       (Icons.mail_rounded, 'Contact', Colors.blue.shade700, _contact),
       (
         Icons.info_rounded,
