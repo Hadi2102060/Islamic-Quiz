@@ -5,6 +5,7 @@ ios/Flutter/
 .dart_tool/
 .packages
 pubspec.lock
+bdApps/
 
 # Large native libraries (very important)
 *.so
